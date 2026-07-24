@@ -281,26 +281,26 @@ function enterLobby() {
 // 招待リンクのQRコードを描画(スマホのカメラで読み取って参加できるようにする)
 function renderLobbyQrCode() {
   const wrap = $("lobby-qr-wrap");
-  const canvas = $("lobby-qr-canvas");
-  if (!wrap || !canvas) return;
+  const target = $("lobby-qr-canvas");
+  if (!wrap || !target) return;
 
-  if (typeof QRCode === "undefined") {
-    console.error("QRCodeライブラリが読み込めていません(CDNブロックの可能性)");
+  if (typeof qrcode === "undefined") {
+    console.error("QRコード生成ライブラリが読み込めていません(js/qrcode-lib.jsを確認してください)");
     wrap.innerHTML = '<p class="hint-text qr-error">QRコードを読み込めませんでした。下の招待リンクをご利用ください。</p>';
     return;
   }
 
-  const inviteUrl = `${location.origin}${location.pathname}?room=${state.roomId}`;
-  QRCode.toCanvas(canvas, inviteUrl, {
-    width: 176,
-    margin: 1,
-    color: { dark: "#10142a", light: "#ffffff" }
-  }, (err) => {
-    if (err) {
-      console.error(err);
-      wrap.innerHTML = '<p class="hint-text qr-error">QRコードの生成に失敗しました。下の招待リンクをご利用ください。</p>';
-    }
-  });
+  try {
+    const inviteUrl = `${location.origin}${location.pathname}?room=${state.roomId}`;
+    // typeNumber 0 = 自動判定、errorCorrectionLevel 'M' = 標準的な誤り訂正レベル
+    const qr = qrcode(0, "M");
+    qr.addData(inviteUrl);
+    qr.make();
+    wrap.innerHTML = qr.createSvgTag(5, 0);
+  } catch (err) {
+    console.error(err);
+    wrap.innerHTML = '<p class="hint-text qr-error">QRコードの生成に失敗しました。下の招待リンクをご利用ください。</p>';
+  }
 }
 
 function listenToPlayers() {
