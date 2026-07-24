@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/king-game.css?v=4">
+<link rel="stylesheet" href="../css/king-game.css?v=5">
 </head>
 <body>
 
@@ -48,12 +48,12 @@
         <h3>招待された部屋に入る</h3>
         <p class="field-label">部屋コード</p>
         <div id="join-code-boxes" class="code-boxes">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 1文字目">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 2文字目">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 3文字目">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 4文字目">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 5文字目">
-          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 6文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-1" aria-label="部屋コード 1文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-2" aria-label="部屋コード 2文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-3" aria-label="部屋コード 3文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-4" aria-label="部屋コード 4文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-5" aria-label="部屋コード 5文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" name="room-code-6" aria-label="部屋コード 6文字目">
         </div>
         <label class="field-label" for="join-name">あなたの名前</label>
         <input id="join-name" class="text-input" type="text" placeholder="例: さとう" maxlength="12">
@@ -173,10 +173,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" onerror="window.__qrLoadFailed=true"></script>
 <script src="../js/king-game-config.js?v=1"></script>
 <script src="../js/king-game-templates.js?v=1"></script>
-<script src="../js/king-game.js?v=4"></script>
+<script src="../js/king-game.js?v=5"></script>
 
 </body>
 </html>

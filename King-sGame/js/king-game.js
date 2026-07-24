@@ -280,16 +280,26 @@ function enterLobby() {
 
 // 招待リンクのQRコードを描画(スマホのカメラで読み取って参加できるようにする)
 function renderLobbyQrCode() {
+  const wrap = $("lobby-qr-wrap");
   const canvas = $("lobby-qr-canvas");
-  if (!canvas || typeof QRCode === "undefined") return;
-  const inviteUrl = `${location.origin}${location.pathname}?room=${state.roomId}`;
+  if (!wrap || !canvas) return;
 
+  if (typeof QRCode === "undefined") {
+    console.error("QRCodeライブラリが読み込めていません(CDNブロックの可能性)");
+    wrap.innerHTML = '<p class="hint-text qr-error">QRコードを読み込めませんでした。下の招待リンクをご利用ください。</p>';
+    return;
+  }
+
+  const inviteUrl = `${location.origin}${location.pathname}?room=${state.roomId}`;
   QRCode.toCanvas(canvas, inviteUrl, {
     width: 176,
     margin: 1,
     color: { dark: "#10142a", light: "#ffffff" }
   }, (err) => {
-    if (err) console.error(err);
+    if (err) {
+      console.error(err);
+      wrap.innerHTML = '<p class="hint-text qr-error">QRコードの生成に失敗しました。下の招待リンクをご利用ください。</p>';
+    }
   });
 }
 
