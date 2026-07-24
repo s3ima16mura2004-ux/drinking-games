@@ -8,136 +8,16 @@ firebase.initializeApp(KING_GAME_FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-/* ---------- 命令テンプレート(カテゴリ分け) ----------
-   slots: 文中に埋め込む番号の数(1 or 2)
-   text : {A} {B} を実際の番号に置き換えて使う
------------------------------------------ */
-const COMMAND_CATEGORIES = [
-  {
-    label: "定番",
-    items: [
-      { slots: 1, text: "{A}番の人が今の気持ちを一言で表す" },
-      { slots: 1, text: "{A}番の人が今日一番言いたかったことを言う" },
-      { slots: 1, text: "次の乾杯の音頭を{A}番の人がとる" },
-      { slots: 1, text: "{A}番の人が謎の高いテンションで挨拶する" },
-      { slots: 1, text: "{A}番の人が店員さんにおすすめを聞く" },
-      { slots: 1, text: "{A}番の人が今夜の一言目標を宣言する" },
-      { slots: 1, text: "{A}番の人が好きな言葉を3秒以内に言う" },
-      { slots: 1, text: "{A}番の人が今年やりたいことを1つ発表する" },
-      { slots: 1, text: "{A}番の人が乾杯前に一言スピーチをする" },
-      { slots: 1, text: "{A}番の人がグラスを掲げて誓いの言葉を言う" }
-    ]
-  },
-  {
-    label: "本音トーク",
-    items: [
-      { slots: 1, text: "{A}番の人が最近あった小さな幸せを話す" },
-      { slots: 1, text: "{A}番の人が今ハマっていることを語る" },
-      { slots: 2, text: "{A}番が{B}番に聞きたいことを一つ質問する" },
-      { slots: 1, text: "{A}番の人が自分の長所を3つ言う" },
-      { slots: 1, text: "{A}番の人が最近のちょっとした失敗談を話す" },
-      { slots: 1, text: "{A}番の人が休日にしていることを話す" },
-      { slots: 1, text: "{A}番の人が今の職場(学校)で一番好きなところを話す" },
-      { slots: 2, text: "{A}番が{B}番の第一印象を教える" },
-      { slots: 1, text: "{A}番の人が最近感動したことを話す" },
-      { slots: 1, text: "{A}番の人が地味に得意なことを教える" },
-      { slots: 1, text: "{A}番の人が今日一番楽しかった瞬間を話す" }
-    ]
-  },
-  {
-    label: "スキンシップ(軽め)",
-    items: [
-      { slots: 2, text: "{A}番と{B}番が腕を組む" },
-      { slots: 2, text: "{A}番と{B}番が指切りげんまんする" },
-      { slots: 2, text: "{A}番と{B}番でハイタッチする" },
-      { slots: 2, text: "{A}番と{B}番でグータッチする" },
-      { slots: 2, text: "{A}番と{B}番が背中合わせになる" },
-      { slots: 2, text: "{A}番が{B}番の肩を揉んであげる" },
-      { slots: 2, text: "{A}番と{B}番であっち向いてホイ勝負、負けた方が一杯飲む" },
-      { slots: 2, text: "{A}番と{B}番が片手で握手をしたまま10秒キープ" },
-      { slots: 2, text: "{A}番と{B}番でウィンクし合う" },
-      { slots: 2, text: "{A}番と{B}番で指相撲をする" }
-    ]
-  },
-  {
-    label: "スキンシップ(ちょっと過激)",
-    items: [
-      { slots: 2, text: "{A}番と{B}番がハグをする" },
-      { slots: 2, text: "{A}番と{B}番が10秒間見つめ合う" },
-      { slots: 2, text: "{A}番と{B}番で耳打ちして一言伝え合う" },
-      { slots: 2, text: "{A}番が{B}番にお酌をする" },
-      { slots: 2, text: "{A}番と{B}番が腕相撲をする" },
-      { slots: 2, text: "{A}番と{B}番が手をつないだまま乾杯する" },
-      { slots: 2, text: "{A}番が{B}番の手のひらに指で文字を書いて当てっこする" }
-    ]
-  },
-  {
-    label: "頭脳戦・心理戦系",
-    items: [
-      { slots: 2, text: "{A}番と{B}番でしりとり対決、先に詰まった方が負け" },
-      { slots: 2, text: "{A}番と{B}番で「せーの」で同じ数字(1〜5)を指で出せたら成功" },
-      { slots: 2, text: "{A}番と{B}番で「せーの」で好きな色を同時に言い、一致するか試す" },
-      { slots: 2, text: "{A}番と{B}番でどちらが先に瞬きするか我慢比べ" },
-      { slots: 2, text: "{A}番と{B}番で、片方が出した手の形(グー/チョキ/パー)を見ずに当てる" }
-    ]
-  },
-  {
-    label: "ミニゲーム系",
-    items: [
-      { slots: 2, text: "{A}番と{B}番で片足立ち対決、先に足をついた方が負け" },
-      { slots: 1, text: "{A}番の人が指定されたNGワードを使わずに1分間話す" },
-      { slots: 2, text: "{A}番と{B}番でジャンケンを5回連続、多く勝った方が勝ち" },
-      { slots: 2, text: "{A}番と{B}番で数字当てゲーム(1〜10の中で相手が思った数字を当てる)" },
-      { slots: 1, text: "{A}番の人が目を閉じたまま10秒数えて、ぴったりで止められるか挑戦" }
-    ]
-  },
-  {
-    label: "親密度チャレンジ",
-    items: [
-      { slots: 1, text: "{A}番の人が自己紹介を一言で言い直す" },
-      { slots: 2, text: "{A}番と{B}番が趣味を1つずつ紹介し合う" },
-      { slots: 1, text: "{A}番の人が好きな食べ物ランキングを3位まで発表する" },
-      { slots: 2, text: "{A}番と{B}番が今日の服装を褒め合う" },
-      { slots: 1, text: "{A}番の人が最近ハマっているお店を紹介する" },
-      { slots: 1, text: "{A}番の人が休日の過ごし方を話す" },
-      { slots: 2, text: "{A}番と{B}番がお互いの出身地の話をする" },
-      { slots: 1, text: "{A}番の人が好きな季節とその理由を話す" },
-      { slots: 2, text: "{A}番と{B}番が好きな音楽のジャンルを紹介し合う" },
-      { slots: 1, text: "{A}番の人が今日一番驚いたことを話す" },
-      { slots: 2, text: "{A}番と{B}番が学生時代のちょっとした黒歴史を話す" },
-      { slots: 2, text: "{A}番が{B}番のイメージを動物に例える" },
-      { slots: 2, text: "{A}番と{B}番が肩を組んで一緒に写真を撮る" },
-      { slots: 1, text: "{A}番の人が今のグループの中で誰に一番助けられているか話す" },
-      { slots: 2, text: "{A}番と{B}番が「せーの」でお互いの第一印象を同時に言う" },
-      { slots: 2, text: "{A}番と{B}番でハイタッチしながら一言褒め合う" },
-      { slots: 2, text: "{A}番が{B}番のいいところを1つ教える" },
-      { slots: 2, text: "{A}番と{B}番が腕を組んで乾杯する" },
-      { slots: 1, text: "{A}番の人が今のメンバーとの思い出を1つ話す" },
-      { slots: 2, text: "{A}番と{B}番が「せーの」で好きな相手のタイプを言い合う" },
-      { slots: 1, text: "{A}番の人が今一番挑戦したいことを話す" },
-      { slots: 2, text: "{A}番が{B}番に、最近気になっていることを1つ聞く" },
-      { slots: 2, text: "{A}番と{B}番が「ここだけの話」を1つずつ交換する" },
-      { slots: 1, text: "{A}番の人が自分が今頑張っていることを打ち明ける" },
-      { slots: 2, text: "{A}番と{B}番が今夜お互いに感謝していることを伝え合う" },
-      { slots: 1, text: "{A}番の人が最近悩んでいることを1つ話す" },
-      { slots: 2, text: "{A}番と{B}番がお互いに直してほしいところを1つずつ、やわらかく伝え合う" },
-      { slots: 1, text: "{A}番の人が今の自分に足りないと思うものを話す" },
-      { slots: 2, text: "{A}番と{B}番が今夜の中で一番印象に残った瞬間を伝え合う" },
-      { slots: 1, text: "{A}番の人が将来の夢や目標を1つ語る" }
-    ]
-  }
-];
-
-// カテゴリ構造をフラットな配列にも展開しておく(select の value と対応させるため)
-const COMMAND_TEMPLATES_FLAT = [];
-COMMAND_CATEGORIES.forEach((cat) => {
-  cat.items.forEach((item) => {
-    COMMAND_TEMPLATES_FLAT.push(item);
-  });
-});
 
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字(0/O/1/I)を除外
 const MIN_SHUFFLE_MS = 1100; // くじ引きシャッフル演出の最低表示時間
+const ROOM_EXPIRY_MS = 2 * 60 * 60 * 1000; // 部屋の有効期限(作成から2時間)
+
+// 部屋の作成から2時間以上経過しているかどうかを判定する
+function isRoomExpired(room) {
+  if (!room || !room.createdAt || typeof room.createdAt.toMillis !== "function") return false;
+  return Date.now() - room.createdAt.toMillis() > ROOM_EXPIRY_MS;
+}
 
 /* ---------- state ---------- */
 const state = {
@@ -149,6 +29,7 @@ const state = {
   myNumber: null,
   isKing: false,
   currentRound: 1,
+  lastRoomStatus: null,
   unsubRoom: null,
   unsubPlayers: null,
   unsubMe: null,
@@ -350,6 +231,10 @@ $("btn-join-room").addEventListener("click", async () => {
       showHomeError("このゲームはすでに始まっています");
       return;
     }
+    if (isRoomExpired(roomSnap.data())) {
+      showHomeError("この部屋は作成から2時間以上経過しているため参加できません");
+      return;
+    }
 
     await roomRef.collection("players").doc(state.uid).set({
       name,
@@ -386,10 +271,26 @@ function enterLobby() {
   $("lobby-room-code").textContent = state.roomId;
   $("lobby-host-controls").hidden = !state.isHost;
   $("lobby-guest-note").hidden = state.isHost;
+  renderLobbyQrCode();
 
   listenToRoom();
   listenToPlayers();
   listenToHistory();
+}
+
+// 招待リンクのQRコードを描画(スマホのカメラで読み取って参加できるようにする)
+function renderLobbyQrCode() {
+  const canvas = $("lobby-qr-canvas");
+  if (!canvas || typeof QRCode === "undefined") return;
+  const inviteUrl = `${location.origin}${location.pathname}?room=${state.roomId}`;
+
+  QRCode.toCanvas(canvas, inviteUrl, {
+    width: 176,
+    margin: 1,
+    color: { dark: "#10142a", light: "#ffffff" }
+  }, (err) => {
+    if (err) console.error(err);
+  });
 }
 
 function listenToPlayers() {
@@ -520,6 +421,14 @@ function listenToRoom() {
       state.isKing = room.kingUid === state.uid;
       state.playerCount = room.playerCount || state.playerCount;
       state.currentRound = room.round || 1;
+
+      // ラウンドの切り替わりを検知して、全員に一瞬の通知を出す
+      if (state.lastRoomStatus === "command" && room.status === "waiting") {
+        showErrorBanner("次のラウンドが始まります", true);
+      } else if (state.lastRoomStatus === "waiting" && room.status === "drawn") {
+        showErrorBanner("くじ引きが始まりました!", true);
+      }
+      state.lastRoomStatus = room.status;
 
       if (room.status === "waiting") {
         if (!$("screen-lobby").classList.contains("is-active")) {
@@ -812,9 +721,10 @@ function cleanupListeners() {
       state.isHost = sessionStorage.getItem("kg_isHost") === "1";
       state.myName = sessionStorage.getItem("kg_myName") || "";
       db.collection("rooms").doc(savedRoomId).get().then((doc) => {
-        if (doc.exists) {
+        if (doc.exists && !isRoomExpired(doc.data())) {
           enterLobby();
         } else {
+          if (doc.exists) showErrorBanner("この部屋は作成から2時間以上経過したため終了しました", true);
           resetToHome();
         }
       }).catch((err) => {

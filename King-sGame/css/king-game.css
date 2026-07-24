@@ -397,6 +397,19 @@ body {
   margin: 6px 0 0;
 }
 
+.qr-wrap {
+  display: inline-block;
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 12px;
+  margin: 10px auto 6px;
+  line-height: 0;
+}
+
+.qr-hint {
+  margin: 0 0 12px;
+}
+
 .player-list {
   list-style: none;
   padding: 0;

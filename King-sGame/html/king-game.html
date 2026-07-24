@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/king-game.css?v=3">
+<link rel="stylesheet" href="../css/king-game.css?v=4">
 </head>
 <body>
 
@@ -70,6 +70,10 @@
       <div class="room-code-block">
         <p class="field-label">部屋コード</p>
         <div class="room-code-display" id="lobby-room-code">------</div>
+        <div id="lobby-qr-wrap" class="qr-wrap">
+          <canvas id="lobby-qr-canvas"></canvas>
+        </div>
+        <p class="hint-text qr-hint">スマホのカメラでQRを読み取ると自動で参加できます</p>
         <button id="btn-copy-link" class="btn btn-ghost btn-small">招待リンクをコピー</button>
         <p id="copy-feedback" class="copy-feedback"></p>
       </div>
@@ -169,8 +173,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script src="../js/king-game-config.js?v=1"></script>
-<script src="../js/king-game.js?v=3"></script>
+<script src="../js/king-game-templates.js?v=1"></script>
+<script src="../js/king-game.js?v=4"></script>
 
 </body>
 </html>
