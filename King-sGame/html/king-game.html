@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>王様ゲーム | 宴の抽選所</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/king-game.css?v=3">
+</head>
+<body>
+
+<div class="night-sky" aria-hidden="true">
+  <div class="lantern lantern-a"></div>
+  <div class="lantern lantern-b"></div>
+  <div class="lantern lantern-c"></div>
+  <div class="stars"></div>
+</div>
+
+<div id="error-banner" class="error-banner" role="alert" hidden>
+  <span id="error-banner-text"></span>
+  <button id="error-banner-close" class="error-banner-close" aria-label="閉じる">×</button>
+</div>
+
+<header class="app-header">
+  <p class="eyebrow">宴の抽選所</p>
+  <h1 class="brand">王様ゲーム</h1>
+</header>
+
+<main id="app" class="app-shell">
+
+  <!-- ============ 画面1: ホーム(作る/参加する) ============ -->
+  <section id="screen-home" class="screen is-active">
+    <div class="card card-choice">
+      <h2 class="card-title">今夜の席を選ぶ</h2>
+
+      <div class="choice-block">
+        <h3>幹事として部屋を作る</h3>
+        <label class="field-label" for="host-name">あなたの名前</label>
+        <input id="host-name" class="text-input" type="text" placeholder="例: たなか" maxlength="12">
+        <button id="btn-create-room" class="btn btn-primary">部屋を作る</button>
+      </div>
+
+      <div class="divider"><span>または</span></div>
+
+      <div class="choice-block">
+        <h3>招待された部屋に入る</h3>
+        <p class="field-label">部屋コード</p>
+        <div id="join-code-boxes" class="code-boxes">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 1文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 2文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 3文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 4文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 5文字目">
+          <input class="code-box" type="text" inputmode="text" maxlength="1" autocomplete="off" aria-label="部屋コード 6文字目">
+        </div>
+        <label class="field-label" for="join-name">あなたの名前</label>
+        <input id="join-name" class="text-input" type="text" placeholder="例: さとう" maxlength="12">
+        <button id="btn-join-room" class="btn btn-secondary">参加する</button>
+      </div>
+
+      <p id="home-error" class="error-text" role="alert"></p>
+    </div>
+  </section>
+
+  <!-- ============ 画面2: 待合室 ============ -->
+  <section id="screen-lobby" class="screen">
+    <div class="card">
+      <div class="room-code-block">
+        <p class="field-label">部屋コード</p>
+        <div class="room-code-display" id="lobby-room-code">------</div>
+        <button id="btn-copy-link" class="btn btn-ghost btn-small">招待リンクをコピー</button>
+        <p id="copy-feedback" class="copy-feedback"></p>
+      </div>
+
+      <h2 class="card-title">集まった人たち <span id="lobby-count">(0)</span></h2>
+      <ul id="lobby-player-list" class="player-list"></ul>
+
+      <div id="lobby-host-controls" class="host-controls" hidden>
+        <p class="hint-text">3人以上集まったらくじを引けます。</p>
+        <button id="btn-start-draw" class="btn btn-primary" disabled>くじ引き開始</button>
+        <button id="btn-close-room" class="btn btn-ghost btn-small btn-danger">部屋を解散する</button>
+      </div>
+      <div id="lobby-guest-note" class="hint-text" hidden>幹事がくじ引きを始めるのを待っています…</div>
+
+      <details id="lobby-history-panel" class="history-panel" hidden>
+        <summary>これまでの命令</summary>
+        <ul id="lobby-history-list" class="history-list"></ul>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 画面3: 抽選/自分の番号 ============ -->
+  <section id="screen-draw" class="screen">
+    <div class="card card-center">
+      <p class="eyebrow">あなたの札</p>
+      <div id="draw-card" class="draw-card">
+        <div class="draw-card-inner">
+          <div class="draw-card-face draw-card-front">
+            <span class="lantern-icon">🏮</span>
+          </div>
+          <div class="draw-card-face draw-card-back">
+            <p class="draw-number-label">あなたは</p>
+            <p id="draw-number" class="draw-number">?</p>
+            <p class="draw-number-label">番</p>
+            <p id="draw-king-badge" class="king-badge" hidden>👑 あなたが王様です</p>
+          </div>
+        </div>
+      </div>
+      <p id="draw-wait-note" class="hint-text">まもなく発表されます…</p>
+    </div>
+
+    <!-- 王様だけに見える命令フォーム -->
+    <div id="king-command-panel" class="card" hidden>
+      <h2 class="card-title">👑 王様の命令</h2>
+      <label class="field-label" for="template-select">お題テンプレート</label>
+      <select id="template-select" class="text-input">
+        <option value="">-- 選ぶ --</option>
+      </select>
+
+      <div id="target-select-block" class="target-select-block" hidden>
+        <div class="target-select-item">
+          <label class="field-label" for="target-a-select">対象①</label>
+          <select id="target-a-select" class="text-input"></select>
+        </div>
+        <div id="target-b-block" class="target-select-item" hidden>
+          <label class="field-label" for="target-b-select">対象②</label>
+          <select id="target-b-select" class="text-input"></select>
+        </div>
+      </div>
+
+      <button id="btn-reroll" class="btn btn-ghost btn-small" hidden>番号をランダムに引き直す</button>
+
+      <label class="field-label" for="command-text">命令内容(自由に編集できます)</label>
+      <textarea id="command-text" class="text-input textarea-input" rows="3" placeholder="例: ①番の人が一発ギャグをする"></textarea>
+
+      <button id="btn-send-command" class="btn btn-primary">この命令を発表する</button>
+    </div>
+  </section>
+
+  <!-- ============ 画面4: 命令発表 ============ -->
+  <section id="screen-command" class="screen">
+    <div class="card card-center">
+      <p class="eyebrow">王様の命令</p>
+      <div class="command-scroll">
+        <p id="command-display" class="command-display"></p>
+      </div>
+      <p class="hint-text">あなたは <strong id="command-my-number"></strong>番でした</p>
+
+      <div id="command-host-controls" class="host-controls" hidden>
+        <button id="btn-next-round" class="btn btn-primary">もう一度くじを引く</button>
+        <button id="btn-close-room-2" class="btn btn-ghost btn-small btn-danger">部屋を解散する</button>
+      </div>
+      <div id="command-guest-note" class="hint-text" hidden>幹事が次のラウンドを始めるのを待っています…</div>
+
+      <details id="command-history-panel" class="history-panel" hidden>
+        <summary>これまでの命令</summary>
+        <ul id="command-history-list" class="history-list"></ul>
+      </details>
+    </div>
+  </section>
+
+  <p id="global-status" class="global-status" aria-live="polite"></p>
+</main>
+
+<!-- Firebase (compat SDK, CDN) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script src="../js/king-game-config.js?v=1"></script>
+<script src="../js/king-game.js?v=3"></script>
+
+</body>
+</html>

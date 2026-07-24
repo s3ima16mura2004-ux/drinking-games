@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宴会ブラックジャック - プレイヤー画面</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="../css/common.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="lantern-glow" aria-hidden="true"></div>
+
+<header class="site-header">
+  <p class="eyebrow">プレイヤー画面(自分のスマホ用)</p>
+  <h1>🏮 宴会ブラックジャック 🏮</h1>
+</header>
+
+<main id="app">
+
+  <!-- ============ 参加画面 ============ -->
+  <section id="screen-join" class="screen screen--active">
+    <div class="panel">
+      <h2>ルームに参加しよう</h2>
+      <label>ルームコード
+        <input id="inputRoomCode" type="text" maxlength="4" placeholder="例: A1B2" autocapitalize="characters">
+      </label>
+      <label>あなたの名前
+        <input id="inputName" type="text" maxlength="8" placeholder="例: あやか">
+      </label>
+      <p id="joinError" class="hint hidden"></p>
+      <button id="btnJoin" class="btn btn--primary" type="button">参加する</button>
+    </div>
+  </section>
+
+  <!-- ============ 参加待ち ============ -->
+  <section id="screen-waiting" class="screen">
+    <div class="panel">
+      <h2>参加しました!</h2>
+      <p class="hint">ホストがゲームを開始するのを待っています…</p>
+      <div id="waitingPlayerList" class="player-chip-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ ゲーム画面(自分の手札のみ) ============ -->
+  <section id="screen-game" class="screen">
+    <div class="round-bar">
+      <span id="roundLabel">ラウンド 1</span>
+      <span id="turnLabel" class="turn-label"></span>
+    </div>
+
+    <div id="eventBanner" class="event-banner hidden">
+      <p class="modal-eyebrow">🏮 ちょうちんタイム 🏮</p>
+      <p id="eventBannerTarget" class="modal-target"></p>
+      <p id="eventBannerText" class="modal-text"></p>
+      <p class="timer"><span id="eventBannerTimer">15</span></p>
+      <div id="eventOwnActions" class="actions hidden">
+        <button id="btnEventSuccess" class="btn btn--gold" type="button">成功!</button>
+        <button id="btnEventFail" class="btn btn--red" type="button">できなかった…</button>
+      </div>
+    </div>
+
+    <div class="table-felt">
+      <div class="hand hand--dealer">
+        <h3>ディーラー <span id="dealerTotal" class="total-chip"></span></h3>
+        <div id="dealerCards" class="card-row"></div>
+      </div>
+
+      <div class="hand hand--active">
+        <div class="active-header">
+          <h3 id="myName">あなたの手札</h3>
+          <div id="myBadges" class="badges"></div>
+        </div>
+        <div id="myCards" class="card-row card-row--large"></div>
+        <p class="total-line">合計 <span id="myTotal" class="total-chip"></span></p>
+
+        <div class="actions">
+          <button id="btnHit" class="btn btn--gold" type="button">引く</button>
+          <button id="btnStand" class="btn" type="button">勝負する</button>
+          <button id="btnJoker" class="btn btn--ghost hidden" type="button">🎭 ジョーカーを使う</button>
+          <button id="btnSwap" class="btn btn--ghost hidden" type="button">🔄 交換チケットを使う</button>
+        </div>
+      </div>
+
+      <ul id="otherPlayersList" class="other-players-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ 結果画面 ============ -->
+  <section id="screen-result" class="screen">
+    <div class="panel">
+      <h2>🏮 結果発表 🏮</h2>
+      <p>ディーラー 合計 <span id="resultDealerTotal" class="total-chip"></span></p>
+      <p id="myOutcome" class="modal-text"></p>
+
+      <div id="penaltyArea" class="hidden">
+        <div id="omikujiBox" class="omikuji-box">
+          <span class="omikuji-box__lid">🪵</span>
+          <p class="omikuji-box__hint">箱をタップして引く</p>
+        </div>
+        <p id="penaltyResult" class="omikuji-slip hidden"></p>
+      </div>
+
+      <p class="hint">次のラウンドはホストが開始します。それまでお待ちください。</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- 交換チケット用モーダル -->
+<div id="modalSwap" class="modal-overlay hidden">
+  <div class="modal">
+    <p class="modal-eyebrow">🔄 交換する相手を選ぼう</p>
+    <div id="swapTargets" class="swap-targets"></div>
+    <button id="btnSwapCancel" class="btn" type="button">やめる</button>
+  </div>
+</div>
+
+<div id="effectToast" class="toast"></div>
+
+<script type="module" src="../js/player.js"></script>
+</body>
+</html>

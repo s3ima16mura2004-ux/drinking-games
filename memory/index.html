@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>宴の罰ゲーム神経衰弱</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div>
+        <a href="../index.html" class="menu-link">⬅ メニューに戻る</a>
+    </div>
+
+    <div class="subtitle">宴の記憶力勝負</div>
+    <h1>罰ゲーム神経衰弱</h1>
+
+    <!-- 【ステップ1】 設定画面 -->
+    <div class="card-box" id="setupScreen">
+        <h2>ゲーム設定</h2>
+        
+        <div class="setting-group">
+            <label>参加人数</label>
+            <div class="control-row">
+                <button class="count-btn" onclick="changePlayerCount(-1)">−</button>
+                <span id="playerCountText" style="font-size: 22px; font-weight: bold;">2</span>
+                <button class="count-btn" onclick="changePlayerCount(1)">＋</button>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <label>難易度（ペアの数）</label>
+            <div class="difficulty-buttons">
+                <button class="diff-btn active" onclick="setDifficulty(4, this)">4ペア (8枚)</button>
+                <button class="diff-btn" onclick="setDifficulty(6, this)">6ペア (12枚)</button>
+                <button class="diff-btn" onclick="setDifficulty(8, this)">8ペア (16枚)</button>
+            </div>
+        </div>
+        
+        <div id="nameInputsContainer" class="name-inputs"></div>
+
+        <button class="action-btn" onclick="startGame()">ゲーム開始</button>
+    </div>
+
+    <!-- 【ステップ2】 ゲーム本番画面 -->
+    <div class="card-box" id="gameScreen" style="display: none;">
+        <div class="info-bar">
+            <span id="turnIndicator" style="color: #f9d423; font-weight: bold;">プレイヤー1の番</span>
+            <span id="timerBox" style="color: #ff6b6b; font-weight: bold;">残り: 10秒</span>
+        </div>
+        
+        <div id="scoreBoard" style="color: #aaa; font-size: 13px; margin-bottom: 10px;">スコア: 0</div>
+
+        <div class="grid" id="board"></div>
+        
+        <div id="eventMessage" style="color: #aaa;">カードをめくってね</div>
+
+        <button class="action-btn" id="restartBtn" onclick="returnToSetup()" style="display: none; margin-top: 15px; background: #2ecc71; color: #fff;">設定に戻る</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

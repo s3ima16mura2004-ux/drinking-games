@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>飲み会ゲームセンター</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #111; color: #fff; margin-top: 50px; }
+        h1 { color: #f1c40f; margin-bottom: 10px; }
+        p { color: #aaa; margin-bottom: 40px; }
+        .menu-container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .game-btn { 
+            font-size: 22px; 
+            padding: 20px 40px; 
+            width: 300px;
+            background: #e74c3c; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: 0.2s;
+        }
+        .game-btn:hover { background: #c0392b; transform: translateY(-2px); }
+        .game-btn:nth-child(2) { background: #3498db; }
+        .game-btn:nth-child(2):hover { background: #2980b9; }
+        .game-btn:nth-child(3) { background: #2ecc71; }
+        .game-btn:nth-child(3):hover { background: #27ae60; }
+    </style>
+</head>
+<body>
+
+    <h1>🍻 飲み会ゲームセンター 🍻</h1>
+    <p>遊ぶゲームを選んでね！</p>
+
+    <div class="menu-container">
+        <a href="King-sGame/index.html" class="game-btn">👑 王様ゲーム</a>
+        <a href="ブラックジャック_改良版/index.html" class="game-btn" style="background: #2980b9;">♠️ ブラックジャック</a>
+        <a href="roulette/index.html" class="game-btn">🔫 ロシアンルーレット</a>
+        <a href="memory/index.html" class="game-btn">🃏 罰ゲーム神経衰弱</a>
+    </div>
+
+</body>
+</html>

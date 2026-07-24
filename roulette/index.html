@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>宴のロシアンルーレット</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div>
+        <a href="../index.html" class="menu-link">⬅ メニューに戻る</a>
+    </div>
+
+    <div class="subtitle">宴の運試し</div>
+    <h1>ロシアンルーレット</h1>
+
+    <!-- 【ステップ1】 参加人数＆プレイヤー名入力画面 -->
+    <div class="card-box" id="setupScreen">
+        <h2>参加人数を決めよう</h2>
+        <div class="player-count-control">
+            <button class="count-btn" onclick="changeCount(-1)">−</button>
+            <span id="playerCountText" style="font-size: 28px; font-weight: bold;">3</span>
+            <button class="count-btn" onclick="changeCount(1)">＋</button>
+        </div>
+        <p style="color: #aaa; font-size: 13px; margin-bottom: 20px;">2〜8人まで対応してるよ</p>
+        
+        <div id="nameInputsContainer" class="name-inputs">
+            <!-- JavaScriptで動的に生成されます -->
+        </div>
+
+        <button class="action-btn" onclick="startGame()">ゲーム開始</button>
+    </div>
+
+    <!-- 【ステップ2】 ゲーム本番画面 -->
+    <div class="card-box" id="gameScreen" style="display: none;">
+        <div class="turn-indicator" id="turnIndicator">プレイヤー1の番</div>
+        
+        <div class="status" id="status">🥃</div>
+        
+        <button class="action-btn" id="shootBtn" onclick="pullTrigger()">引き金を引く！</button>
+        
+        <div id="message">順番に引き金を引いてね...</div>
+
+        <button class="action-btn" id="restartBtn" onclick="resetGame()" style="display: none; margin-top: 15px; background: #2ecc71; color: #fff;">もう一度遊ぶ</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

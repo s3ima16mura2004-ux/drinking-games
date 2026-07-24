@@ -1,0 +1,551 @@
+/* ==========================================================
+   王様ゲーム - 宴の抽選所
+   トーン: 夜の居酒屋 / 提灯の灯り / 木札のくじ引き
+   ========================================================== */
+
+:root {
+  --bg-night: #10142a;
+  --bg-night-deep: #0a0d1c;
+  --panel: #1b2140;
+  --panel-line: #2c3460;
+  --lantern-red: #e2593f;
+  --lantern-red-soft: rgba(226, 89, 63, 0.35);
+  --gold: #d4a64a;
+  --gold-soft: rgba(212, 166, 74, 0.25);
+  --paper: #f3ecd8;
+  --paper-dim: #b9b3a6;
+  --text-main: #f2eee2;
+  --text-muted: #9098bf;
+  --danger: #c65656;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --font-display: 'Shippori Mincho', serif;
+  --font-body: 'Zen Kaku Gothic New', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-night);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  min-height: 100%;
+}
+
+body {
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ---------- 背景演出: 夜空 + 提灯 ---------- */
+.night-sky {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% -10%, #232a52 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg-night) 0%, var(--bg-night-deep) 100%);
+}
+
+.stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.5) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 70% 20%, rgba(255,255,255,0.4) 50%, transparent 51%),
+    radial-gradient(1px 1px at 40% 60%, rgba(255,255,255,0.35) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 85% 55%, rgba(255,255,255,0.3) 50%, transparent 51%),
+    radial-gradient(1px 1px at 10% 75%, rgba(255,255,255,0.3) 50%, transparent 51%);
+  opacity: 0.8;
+}
+
+.lantern {
+  position: absolute;
+  width: 70px;
+  height: 90px;
+  border-radius: 50% 50% 45% 45%;
+  background: radial-gradient(ellipse at 50% 40%, var(--lantern-red) 0%, #a83a26 100%);
+  box-shadow: 0 0 40px 10px var(--lantern-red-soft);
+  opacity: 0.55;
+  animation: sway 6s ease-in-out infinite;
+}
+.lantern::before {
+  content: "";
+  position: absolute;
+  top: -14px; left: 50%;
+  transform: translateX(-50%);
+  width: 2px; height: 16px;
+  background: rgba(255,255,255,0.2);
+}
+.lantern-a { top: 6%; left: 8%; animation-delay: 0s; }
+.lantern-b { top: 14%; right: 10%; width: 50px; height: 66px; animation-delay: 1.2s; }
+.lantern-c { top: 32%; left: 78%; width: 40px; height: 52px; animation-delay: 2.4s; opacity: 0.35; }
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-3deg) translateY(0); }
+  50% { transform: rotate(3deg) translateY(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lantern { animation: none; }
+  .draw-card.is-shuffling .draw-card-inner { animation: none; }
+}
+
+/* ---------- レイアウト ---------- */
+.app-header {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 36px 20px 12px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--gold);
+  font-weight: 500;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  letter-spacing: 0.08em;
+  color: var(--paper);
+  text-shadow: 0 0 24px rgba(226,89,63,0.4);
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px 16px 60px;
+}
+
+.screen { display: none; }
+.screen.is-active { display: block; animation: fadeIn 0.35s ease; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- カード ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-lg);
+  padding: 24px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+
+.card-center { text-align: center; }
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  margin: 0 0 16px;
+  color: var(--paper);
+  letter-spacing: 0.03em;
+}
+
+/* ---------- ホーム画面 ---------- */
+.choice-block h3 {
+  font-size: 15px;
+  margin: 0 0 10px;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.divider {
+  text-align: center;
+  margin: 22px 0;
+  position: relative;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.divider::before, .divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--panel-line);
+}
+.divider::before { left: 0; }
+.divider::after { right: 0; }
+
+.field-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 14px 0 6px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-line);
+  background: var(--bg-night-deep);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.text-input:focus {
+  border-color: var(--gold);
+}
+
+.code-boxes {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.code-box {
+  width: 15%;
+  min-width: 44px;
+  height: 52px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-line);
+  background: var(--bg-night-deep);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.code-box:focus {
+  border-color: var(--gold);
+}
+
+/* ---------- エラーバナー ---------- */
+.error-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 18px;
+  background: linear-gradient(90deg, #7a2d21, #a8402c);
+  color: var(--paper);
+  font-size: 13px;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+
+.error-banner.is-info {
+  background: linear-gradient(90deg, #4a5a2f, #6b8038);
+}
+
+.error-banner-close {
+  background: none;
+  border: none;
+  color: var(--paper);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* ---------- ラウンド履歴パネル ---------- */
+.history-panel {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--panel-line);
+}
+
+.history-panel summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--gold);
+  font-weight: 700;
+  outline: none;
+}
+
+.history-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.history-list li {
+  background: var(--bg-night-deep);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.history-round-badge {
+  color: var(--gold);
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.history-king-name {
+  color: var(--text-muted);
+  font-size: 12px;
+  display: block;
+  margin-top: 2px;
+}
+
+.textarea-input {
+  resize: vertical;
+  min-height: 60px;
+  font-size: 15px;
+}
+
+/* ---------- ボタン ---------- */
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--lantern-red), #c8432c);
+  color: var(--paper);
+  box-shadow: 0 6px 18px rgba(226,89,63,0.35);
+}
+
+.btn-secondary {
+  background: var(--gold);
+  color: var(--bg-night-deep);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--panel-line);
+  color: var(--text-muted);
+}
+
+.btn-small {
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 13px;
+  width: auto;
+  display: inline-block;
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: rgba(198,86,86,0.4);
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 13px;
+  min-height: 18px;
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+/* ---------- 待合室 ---------- */
+.room-code-block {
+  text-align: center;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--panel-line);
+}
+
+.room-code-display {
+  font-family: var(--font-display);
+  font-size: 40px;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  margin: 4px 0 12px;
+}
+
+.copy-feedback {
+  font-size: 12px;
+  color: var(--gold);
+  min-height: 16px;
+  margin: 6px 0 0;
+}
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-list li {
+  background: var(--bg-night-deep);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  padding: 10px 18px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.host-controls { margin-top: 6px; }
+
+.hint-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  margin: 10px 0 0;
+}
+
+/* ---------- くじ引きカード ---------- */
+.draw-card {
+  width: 160px;
+  height: 210px;
+  margin: 12px auto 20px;
+  perspective: 1000px;
+}
+
+.draw-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.draw-card.is-flipped .draw-card-inner {
+  transform: rotateY(180deg);
+}
+
+.draw-card.is-shuffling .draw-card-inner {
+  animation: card-shuffle 0.45s ease-in-out infinite;
+}
+
+@keyframes card-shuffle {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-8px) rotate(-5deg); }
+  50% { transform: translateX(0) rotate(0deg); }
+  75% { transform: translateX(8px) rotate(5deg); }
+}
+
+.draw-card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-md);
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--panel-line);
+}
+
+.draw-card-front {
+  background: linear-gradient(160deg, #232b52, var(--bg-night-deep));
+}
+
+.lantern-icon { font-size: 46px; filter: drop-shadow(0 0 14px var(--lantern-red-soft)); }
+
+.draw-card-back {
+  background: linear-gradient(160deg, var(--gold), #b6853a);
+  color: var(--bg-night-deep);
+  transform: rotateY(180deg);
+}
+
+.draw-number-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.draw-number {
+  margin: 2px 0;
+  font-family: var(--font-display);
+  font-size: 56px;
+  line-height: 1;
+}
+
+.king-badge {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(16,20,42,0.15);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+/* ---------- 王様命令パネル ---------- */
+#king-command-panel { border-color: var(--gold); }
+
+.target-select-block {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.target-select-item {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 命令発表画面 ---------- */
+.command-scroll {
+  background: var(--bg-night-deep);
+  border: 1px solid var(--gold-soft);
+  border-radius: var(--radius-md);
+  padding: 22px 16px;
+  margin: 10px 0 16px;
+}
+
+.command-display {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--paper);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.global-status {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+  margin-top: 10px;
+}
+
+/* ---------- レスポンシブ ---------- */
+@media (max-width: 380px) {
+  .brand { font-size: 28px; }
+  .room-code-display { font-size: 32px; }
+  .draw-card { width: 140px; height: 184px; }
+}
