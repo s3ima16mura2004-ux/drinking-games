@@ -45,13 +45,27 @@
             <div class="hint-text">👑王様カード＝6ペア以上、🔄シャッフルカード＝8ペア以上で登場</div>
         </div>
         
+        <div class="setting-group">
+            <label>1ターンの制限時間</label>
+            <div class="difficulty-buttons">
+                <button class="timer-btn" data-seconds="5" onclick="setTimerDuration(5, this)">5秒</button>
+                <button class="timer-btn active" data-seconds="10" onclick="setTimerDuration(10, this)">10秒</button>
+                <button class="timer-btn" data-seconds="15" onclick="setTimerDuration(15, this)">15秒</button>
+                <button class="timer-btn" data-seconds="20" onclick="setTimerDuration(20, this)">20秒</button>
+            </div>
+        </div>
+
         <div id="nameInputsContainer" class="name-inputs"></div>
 
         <div class="setting-group">
             <label>音声・振動演出</label>
             <label class="toggle-label">
+                <input type="checkbox" id="soundToggle" checked>
+                🔔 効果音を鳴らす
+            </label>
+            <label class="toggle-label">
                 <input type="checkbox" id="voiceToggle" checked>
-                🔊 イベントを音声で読み上げる
+                🗣️ イベントを音声で読み上げる
             </label>
         </div>
 
@@ -74,9 +88,12 @@
 
         <div class="grid" id="board"></div>
         
-        <div id="eventMessage" class="event-message">カードをめくってね</div>
+        <div id="eventMessage" class="event-message" aria-live="polite" role="status">カードをめくってね</div>
 
-        <button class="action-btn restart-btn" id="restartBtn" onclick="returnToSetup()" style="display: none;">設定に戻る</button>
+        <div class="result-actions" id="resultActions" style="display: none;">
+            <button class="action-btn restart-same-btn" onclick="quickPlayAgain()">🔁 同じメンバーでもう一度</button>
+            <button class="action-btn restart-btn" onclick="returnToSetup()">⚙ 設定に戻る</button>
+        </div>
     </div>
 
     <script src="script.js"></script>

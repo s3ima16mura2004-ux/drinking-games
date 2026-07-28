@@ -120,6 +120,18 @@ body {
   text-shadow: 0 0 24px rgba(226,89,63,0.4);
 }
 
+.round-indicator {
+  display: inline-block;
+  margin: 10px auto 0;
+  padding: 4px 16px;
+  border: 1px solid var(--gold-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: var(--gold);
+  background: rgba(212, 166, 74, 0.08);
+}
+
 .app-shell {
   position: relative;
   z-index: 1;

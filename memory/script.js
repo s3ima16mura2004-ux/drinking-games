@@ -13,6 +13,7 @@ let isLocked = false;
 // 制限時間タイマー関連
 let turnTimer = null;
 let timeLeft = 10;
+let turnDuration = 10; // 【新機能】1ターンの制限時間（設定画面で変更可能）
 
 const defaultRewards = [
     "✨ ペア成立！好きな人に一口飲ませる権！",
@@ -31,19 +32,46 @@ const defaultPenalties = [
 let rewards = [...defaultRewards];
 let penalties = [...defaultPenalties];
 
-// 【新機能】連続成功コンボ管理
+// 連続成功コンボ管理
 let comboCount = {};
 
-// 【新機能】音声読み上げON/OFF
+// 音声読み上げ／効果音のON・OFF（別々に管理）
 let voiceEnabled = true;
+let soundEnabled = true;
+
+// 初回読み込み時に保存済みの名前を復元するためのキャッシュ
+let savedNamesCache = null;
+
+// 使い回す単一のAudioContext（毎回生成すると環境によって音が途切れるため）
+let sharedAudioCtx = null;
 
 const STORAGE_KEY_PENALTY = "partyGame_customPenalties";
 const STORAGE_KEY_VOICE = "partyGame_voiceEnabled";
+const STORAGE_KEY_SOUND = "partyGame_soundEnabled";
+const STORAGE_KEY_TIMER = "partyGame_turnDuration";
+const STORAGE_KEY_NAMES = "partyGame_playerNames";
 
-// 【簡易効果音（Web Audio API）】
+// 【簡易効果音（Web Audio API）】AudioContextは使い回して安定させる
+function getAudioContext() {
+    if (!sharedAudioCtx) {
+        try {
+            sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            return null;
+        }
+    }
+    // ブラウザによってはタップ後にresumeが必要
+    if (sharedAudioCtx.state === "suspended") {
+        sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+}
+
 function playSound(type) {
+    if (!soundEnabled) return;
     try {
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioCtx = getAudioContext();
+        if (!audioCtx) return;
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
         osc.connect(gain);
@@ -73,7 +101,7 @@ function playSound(type) {
     }
 }
 
-// 【新機能】音声読み上げ（Web Speech API）
+// 音声読み上げ（Web Speech API）
 function speak(text) {
     if (!voiceEnabled) return;
     try {
@@ -90,7 +118,7 @@ function speak(text) {
     }
 }
 
-// 【新機能】スマホ振動（Vibration API）
+// スマホ振動（Vibration API）
 function vibrate(pattern) {
     if (navigator.vibrate) {
         try {
@@ -101,32 +129,64 @@ function vibrate(pattern) {
     }
 }
 
-// 【新機能】カスタム罰ゲーム・音声設定の保存＆読み込み
+// 【新機能】設定・名前をlocalStorageに保存
+function saveSettings(customPenaltyText, voiceChecked, soundChecked, timerSeconds, namesArray) {
+    try {
+        localStorage.setItem(STORAGE_KEY_PENALTY, customPenaltyText);
+        localStorage.setItem(STORAGE_KEY_VOICE, voiceChecked);
+        localStorage.setItem(STORAGE_KEY_SOUND, soundChecked);
+        localStorage.setItem(STORAGE_KEY_TIMER, timerSeconds);
+        localStorage.setItem(STORAGE_KEY_NAMES, JSON.stringify(namesArray));
+    } catch (e) {
+        // localStorage非対応環境への配慮
+    }
+}
+
+// 保存済みの設定・名前を読み込んで画面に反映
 function loadSavedSettings() {
     try {
         let savedPenalties = localStorage.getItem(STORAGE_KEY_PENALTY);
         if (savedPenalties) {
             document.getElementById("customPenaltyInput").value = savedPenalties;
         }
+
         let savedVoice = localStorage.getItem(STORAGE_KEY_VOICE);
         if (savedVoice !== null) {
             document.getElementById("voiceToggle").checked = savedVoice === "true";
         }
+
+        let savedSound = localStorage.getItem(STORAGE_KEY_SOUND);
+        if (savedSound !== null) {
+            document.getElementById("soundToggle").checked = savedSound === "true";
+        }
+
+        let savedTimer = localStorage.getItem(STORAGE_KEY_TIMER);
+        if (savedTimer) {
+            let seconds = parseInt(savedTimer, 10);
+            if (!isNaN(seconds)) {
+                turnDuration = seconds;
+                document.querySelectorAll(".timer-btn").forEach(btn => {
+                    btn.classList.toggle("active", parseInt(btn.dataset.seconds, 10) === seconds);
+                });
+            }
+        }
+
+        let savedNames = localStorage.getItem(STORAGE_KEY_NAMES);
+        if (savedNames) {
+            let parsed = JSON.parse(savedNames);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                savedNamesCache = parsed;
+                playerCount = Math.min(Math.max(parsed.length, 1), 6);
+                document.getElementById("playerCountText").innerText = playerCount;
+            }
+        }
     } catch (e) {
         // localStorage非対応環境への配慮
     }
+    updateNameInputs();
 }
 
-function saveSettings(customPenaltyText, voiceChecked) {
-    try {
-        localStorage.setItem(STORAGE_KEY_PENALTY, customPenaltyText);
-        localStorage.setItem(STORAGE_KEY_VOICE, voiceChecked);
-    } catch (e) {
-        // localStorage非対応環境への配慮
-    }
-}
-
-// 【新機能】連続成功コンボの加算とバナー表示
+// 連続成功コンボの加算とバナー表示
 function triggerCombo(name) {
     comboCount[name] = (comboCount[name] || 0) + 1;
     let combo = comboCount[name];
@@ -157,7 +217,7 @@ function showComboBanner(combo, name) {
     setTimeout(() => banner.remove(), 1500);
 }
 
-// 【新機能】シャッフルカード：まだめくられていないカードの中身を入れ替える
+// シャッフルカード：まだめくられていないカードの中身を入れ替える
 function shuffleRemainingCards() {
     let board = document.getElementById("board");
     let cards = Array.from(board.children).filter(c => !c.classList.contains("matched"));
@@ -171,17 +231,30 @@ function shuffleRemainingCards() {
     });
 }
 
+// 【バグ修正】参加人数を変更しても、すでに入力済みの名前は消さずに保持する
 function updateNameInputs() {
     const container = document.getElementById("nameInputsContainer");
+    const existingInputs = Array.from(container.querySelectorAll(".name-input"));
+    let existingValues = existingInputs.map(input => input.value);
+
+    // 初回読み込み時（入力欄が1つも無い状態）は保存済みの名前があればそれを使う
+    if (existingValues.length === 0 && savedNamesCache) {
+        existingValues = savedNamesCache;
+    }
+
     container.innerHTML = "";
     for (let i = 0; i < playerCount; i++) {
         let input = document.createElement("input");
         input.type = "text";
         input.className = "name-input";
         input.placeholder = `プレイヤー${i + 1}`;
-        input.value = `プレイヤー${i + 1}`;
+        // 既存の入力があれば復元し、新規に増えた枠だけデフォルト名にする
+        input.value = (existingValues[i] && existingValues[i].trim() !== "")
+            ? existingValues[i]
+            : `プレイヤー${i + 1}`;
         container.appendChild(input);
     }
+    savedNamesCache = null; // 一度反映したら使い切る
 }
 
 function changePlayerCount(amount) {
@@ -198,6 +271,42 @@ function setDifficulty(count, btnElement) {
     btnElement.classList.add("active");
 }
 
+// 【新機能】1ターンの制限時間を選択
+function setTimerDuration(seconds, btnElement) {
+    turnDuration = seconds;
+    document.querySelectorAll(".timer-btn").forEach(btn => btn.classList.remove("active"));
+    btnElement.classList.add("active");
+}
+
+// デッキ（カード配列）を作成してボードに描画する共通処理
+function buildDeckAndBoard() {
+    matchedCount = 0;
+
+    // カードの準備（アイコン＋特殊カードを混ぜる。難易度が上がるほど特殊カードも増える）
+    let specialPairs = ['💣', '👀']; // 爆弾ペア／透視ペアは常に登場
+    if (pairCount >= 6) specialPairs.push('👑'); // 王様カード（6ペア以上で登場）
+    if (pairCount >= 8) specialPairs.push('🔄'); // シャッフルカード（8ペア以上で登場）
+
+    let normalCount = pairCount - specialPairs.length;
+    let selectedIcons = cardValuesPool.slice(0, normalCount); // 通常枠
+
+    currentCards = [...selectedIcons, ...selectedIcons, ...specialPairs, ...specialPairs];
+    currentCards.sort(() => Math.random() - 0.5);
+
+    let board = document.getElementById("board");
+    board.innerHTML = "";
+
+    currentCards.forEach((val, index) => {
+        let card = document.createElement("div");
+        card.classList.add("card");
+        card.dataset.value = val;
+        card.dataset.index = index;
+        card.innerText = "❓";
+        card.addEventListener("click", flipCard);
+        board.appendChild(card);
+    });
+}
+
 function startGame() {
     const inputs = document.querySelectorAll(".name-input");
     players = [];
@@ -210,9 +319,9 @@ function startGame() {
         comboCount[name] = 0;
     });
 
-    // 【新機能】音声＆カスタム罰ゲームの設定を反映
-    let voiceToggle = document.getElementById("voiceToggle");
-    voiceEnabled = voiceToggle.checked;
+    // 音声・効果音・カスタム罰ゲームの設定を反映
+    voiceEnabled = document.getElementById("voiceToggle").checked;
+    soundEnabled = document.getElementById("soundToggle").checked;
 
     let customPenaltyText = document.getElementById("customPenaltyInput").value;
     let customLines = customPenaltyText.split("\n").map(s => s.trim()).filter(s => s.length > 0);
@@ -221,48 +330,41 @@ function startGame() {
         : [...defaultPenalties];
     rewards = [...defaultRewards];
 
-    saveSettings(customPenaltyText, voiceEnabled);
+    // 【新機能】次回のために設定と名前を保存
+    saveSettings(customPenaltyText, voiceEnabled, soundEnabled, turnDuration, players);
 
     currentTurnIndex = 0;
-    matchedCount = 0;
-    
-    // カードの準備（アイコン＋特殊カードを混ぜる。難易度が上がるほど特殊カードも増える）
-    let specialPairs = ['💣', '👀']; // 爆弾ペア／透視ペアは常に登場
-    if (pairCount >= 6) specialPairs.push('👑'); // 王様カード（6ペア以上で登場）
-    if (pairCount >= 8) specialPairs.push('🔄'); // シャッフルカード（8ペア以上で登場）
-
-    let normalCount = pairCount - specialPairs.length;
-    let selectedIcons = cardValuesPool.slice(0, normalCount); // 通常枠
-
-    currentCards = [...selectedIcons, ...selectedIcons, ...specialPairs, ...specialPairs];
-
-    currentCards.sort(() => Math.random() - 0.5);
-
-    let board = document.getElementById("board");
-    board.innerHTML = "";
-    
-    currentCards.forEach((val, index) => {
-        let card = document.createElement("div");
-        card.classList.add("card");
-        card.dataset.value = val;
-        card.dataset.index = index;
-        card.innerText = "❓";
-        card.addEventListener("click", flipCard);
-        board.appendChild(card);
-    });
+    buildDeckAndBoard();
 
     document.getElementById("setupScreen").style.display = "none";
     document.getElementById("gameScreen").style.display = "block";
-    document.getElementById("restartBtn").style.display = "none";
-    
+    document.getElementById("resultActions").style.display = "none";
+
     updateStatusDisplay();
     startTimer();
 }
 
-// 【3. 制限時間タイマー開始】
+// 【新機能】結果画面から「同じメンバーでもう一度」
+function quickPlayAgain() {
+    scores = {};
+    comboCount = {};
+    players.forEach(p => {
+        scores[p] = 0;
+        comboCount[p] = 0;
+    });
+    currentTurnIndex = 0;
+
+    buildDeckAndBoard();
+    document.getElementById("resultActions").style.display = "none";
+
+    updateStatusDisplay();
+    startTimer();
+}
+
+// 制限時間タイマー開始（設定画面で選んだ秒数を使用）
 function startTimer() {
     clearInterval(turnTimer);
-    timeLeft = 10;
+    timeLeft = turnDuration;
     document.getElementById("timerBox").innerText = `残り: ${timeLeft}秒`;
 
     turnTimer = setInterval(() => {
@@ -281,7 +383,7 @@ function handleTimeOut() {
     playSound('wrong');
     vibrate([300]);
     let currentName = players[currentTurnIndex];
-    resetCombo(currentName); // 【新機能】コンボリセット
+    resetCombo(currentName);
     let eventMsg = document.getElementById("eventMessage");
     eventMsg.style.color = "#ff6b6b";
     eventMsg.innerText = `⏰ タイムアウト！${currentName} の時間切れペナルティ（一気飲み）！`;
@@ -317,8 +419,9 @@ function flipCard() {
 
     const card = this;
     playSound('flip');
+    vibrate([15]); // 【新機能】めくる瞬間の軽いタップ感
 
-    // 【新機能】めくる直前にドキドキ演出（一瞬揺れてから中身を見せる）
+    // めくる直前にドキドキ演出（一瞬揺れてから中身を見せる）
     card.classList.add("flipping");
 
     setTimeout(() => {
@@ -347,30 +450,30 @@ function checkMatch() {
         matchedCount += 2;
         scores[currentName]++;
 
-        // 【新機能】連続成功コンボを加算
+        // 連続成功コンボを加算
         let combo = triggerCombo(currentName);
 
         if (val === '💣') {
-            // 【1. 爆弾カード発動】
+            // 爆弾カード発動
             playSound('bomb');
             vibrate([200, 100, 200]);
             eventMsg.style.color = "#ff4757";
             eventMsg.innerText = `💥 爆弾カード炸裂！！${currentName} は今すぐコンビニにダッシュしておつまみ（または飲み物）を買ってくるパシリの刑！`;
         } else if (val === '👀') {
-            // 【2. 特殊カード（透視）発動】
+            // 特殊カード（透視）発動
             playSound('match');
             vibrate([60]);
             eventMsg.style.color = "#3498db";
             eventMsg.innerText = `👀 透視成功！もう一度あなたのターン＆ポイント2倍！`;
             scores[currentName]++; // ボーナス
         } else if (val === '👑') {
-            // 【新機能】王様カード発動：誰か1人を指名して罰ゲームを実行させられる
+            // 王様カード発動：誰か1人を指名して罰ゲームを実行させられる
             playSound('match');
             vibrate([100, 100, 100]);
             eventMsg.style.color = "#f9d423";
             eventMsg.innerText = `👑 王様カード成立！${currentName} は誰か1人を指名して、好きな罰ゲームを実行させることができる！`;
         } else if (val === '🔄') {
-            // 【新機能】シャッフルカード発動：残りのカードの中身をシャッフル
+            // シャッフルカード発動：残りのカードの中身をシャッフル
             playSound('match');
             vibrate([50, 50, 50, 50, 50]);
             shuffleRemainingCards();
@@ -384,7 +487,7 @@ function checkMatch() {
             eventMsg.innerText = `${currentName} がペア成功！\n${randomReward}`;
         }
 
-        // 【新機能】3連続コンボボーナス（追加の一言）
+        // 3連続コンボボーナス（追加の一言）
         if (combo === 3) {
             eventMsg.innerText += `\n🌟 3連続ボーナス！${currentName} は周りの人からの質問攻めに答える刑！`;
         }
@@ -394,11 +497,18 @@ function checkMatch() {
 
         if (matchedCount === currentCards.length) {
             setTimeout(() => {
-                let winner = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+                // 【新機能】同点の場合は全員の名前を表示する
+                let maxScore = Math.max(...Object.values(scores));
+                let winners = Object.keys(scores).filter(name => scores[name] === maxScore);
+
                 eventMsg.style.color = "#f9d423";
-                eventMsg.innerText = `🎉 ゲーム終了！勝者は ${winner} さん！ 🎉`;
+                if (winners.length === 1) {
+                    eventMsg.innerText = `🎉 ゲーム終了！勝者は ${winners[0]} さん！ 🎉`;
+                } else {
+                    eventMsg.innerText = `🎉 ゲーム終了！${winners.join("さんと")}さんが同点優勝！ 🎉`;
+                }
                 speak(eventMsg.innerText);
-                document.getElementById("restartBtn").style.display = "block";
+                document.getElementById("resultActions").style.display = "flex";
             }, 500);
         } else {
             isLocked = false;
@@ -410,7 +520,7 @@ function checkMatch() {
         playSound('wrong');
         vibrate([150]);
         isLocked = true;
-        resetCombo(currentName); // 【新機能】コンボリセット
+        resetCombo(currentName);
         let randomPenalty = penalties[Math.floor(Math.random() * penalties.length)];
         eventMsg.style.color = "#ff6b6b";
         eventMsg.innerText = `${currentName} はハズレ…！\n${randomPenalty}`;
@@ -441,5 +551,4 @@ function returnToSetup() {
     document.getElementById("setupScreen").style.display = "block";
 }
 
-updateNameInputs();
 loadSavedSettings();

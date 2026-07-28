@@ -179,7 +179,7 @@ body {
     flex-wrap: wrap;
     gap: 8px;
 }
-.diff-btn {
+.diff-btn, .timer-btn {
     flex: 1 1 auto;
     min-width: 90px;
     min-height: var(--tap-min);
@@ -194,7 +194,7 @@ body {
     font-weight: 700;
     touch-action: manipulation;
 }
-.diff-btn.active {
+.diff-btn.active, .timer-btn.active {
     background: linear-gradient(135deg, #ff2e7e, #ffce3f);
     color: #1a0b2e;
     border-color: var(--neon-gold);
@@ -293,10 +293,23 @@ body {
 .action-btn:active { transform: scale(0.98); opacity: 0.92; }
 
 .restart-btn {
-    margin-top: 16px;
+    margin-top: 0;
     background: linear-gradient(135deg, #39ff88, #2de2e6);
     color: #0b1a12;
     box-shadow: 0 6px 18px rgba(57, 255, 136, 0.3);
+}
+
+.result-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.restart-same-btn {
+    background: linear-gradient(135deg, #ffce3f, #ff2e7e);
+    color: #1a0b2e;
+    box-shadow: 0 6px 18px rgba(255, 46, 126, 0.3);
 }
 
 /* ---------- ゲーム画面 ---------- */
@@ -432,7 +445,7 @@ body {
 @media (max-width: 360px) {
     .grid { gap: 5px; }
     .card { font-size: 18px; border-radius: 8px; }
-    .diff-btn { min-width: 78px; font-size: 11px; padding: 8px 4px; }
+    .diff-btn, .timer-btn { min-width: 78px; font-size: 11px; padding: 8px 4px; }
 }
 
 @media (min-width: 700px) {
@@ -440,7 +453,7 @@ body {
     .card-box { max-width: 520px; }
     .grid { gap: 12px; }
     .card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.4); }
-    .diff-btn:hover { border-color: var(--neon-gold); }
+    .diff-btn:hover, .timer-btn:hover { border-color: var(--neon-gold); }
     .count-btn:hover { background: var(--neon-pink); border-color: var(--neon-pink); }
 }
 

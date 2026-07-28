@@ -18,26 +18,50 @@
         match /databases/{database}/documents {
           match /rooms/{roomId} {
             allow read: if request.auth != null;
-            allow create: if request.auth != null;
-            allow update, delete: if request.auth != null;
+            allow create: if request.auth != null
+              && request.resource.data.hostUid == request.auth.uid
+              && request.resource.data.status == "waiting";
+            allow update: if request.auth != null;
+            allow delete: if request.auth != null;
 
             match /players/{playerId} {
               allow read: if request.auth != null;
-              allow write: if request.auth != null;
+              // 自分のプレイヤードキュメントだけ作成・更新できる
+              allow create: if request.auth != null && request.auth.uid == playerId;
+              allow update: if request.auth != null;
+              allow delete: if request.auth != null;
+            }
+
+            match /history/{entryId} {
+              allow read: if request.auth != null;
+              allow create: if request.auth != null;
+              allow delete: if request.auth != null;
             }
           }
         }
       }
 
       ※ このゲームは「身内の飲み会で使う」前提の簡易ルールです。
-        誰でも読み書きできてしまうので、機密情報は入れないでください。
+        部屋コードさえ知っていれば誰でも読み書きできてしまう構造は変わらないため、
+        機密情報は入れないでください。上記は最低限の悪戯防止(他人のプレイヤー
+        ドキュメントへのなりすまし作成を防ぐ、など)を加えたものです。
+
+   【期限切れルームの自動削除について】
+   このコードは「join時にブロックする」「クライアントが検知したら削除する」という
+   簡易的な対処のみを行っています。より確実に自動削除したい場合は、Firestoreの
+   TTL(Time-to-live)ポリシーを使うのがおすすめです:
+     1. Firebase コンソール → Firestore Database → 「TTL」タブ
+     2. コレクショングループ「rooms」に対して、フィールド「createdAt」を指定
+     3. 有効化すると、作成から一定時間後にドキュメントが自動削除される
+        (players/history などのサブコレクションは別途 Cloud Functions での
+         削除が必要になる場合があります)
    ========================================================== */
 
 const KING_GAME_FIREBASE_CONFIG = {
   apiKey: "AIzaSyCFHcgn-W7SZuEYFeKBHK4O_GYYoR9ztM8",
   authDomain: "king-s-game-69946.firebaseapp.com",
   projectId: "king-s-game-69946",
-  storageBucket: "king-s-game-69946.firebasestorage.ap",
+  storageBucket: "king-s-game-69946.firebasestorage.app",
   messagingSenderId: "77028177674",
   appId: "1:77028177674:web:7b2fb2f29323c25e0a2cf3"
 };

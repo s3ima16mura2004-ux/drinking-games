@@ -12,6 +12,10 @@ const db = firebase.firestore();
 const ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい文字(0/O/1/I)を除外
 const MIN_SHUFFLE_MS = 1100; // くじ引きシャッフル演出の最低表示時間
 const ROOM_EXPIRY_MS = 2 * 60 * 60 * 1000; // 部屋の有効期限(作成から2時間)
+const ROOM_EXPIRY_WARNING_MS = 15 * 60 * 1000; // 期限の15分前になったら警告を出す
+const MAX_PLAYERS = 30; // 部屋あたりの参加人数の上限(ソフトキャップ)
+let expiryWarningShown = false;
+let expiryCheckTimer = null;
 
 // 部屋の作成から2時間以上経過しているかどうかを判定する
 function isRoomExpired(room) {
@@ -46,6 +50,51 @@ function showScreen(id) {
 
 function setStatus(msg) {
   $("global-status").textContent = msg || "";
+}
+
+// ヘッダー下に「第◯幕」を表示する(ホーム画面では非表示)
+function updateRoundIndicator() {
+  const el = $("round-indicator");
+  if (!el) return;
+  el.hidden = false;
+  el.textContent = `第${state.currentRound}幕`;
+}
+
+function hideRoundIndicator() {
+  const el = $("round-indicator");
+  if (el) el.hidden = true;
+}
+
+/* ---------- 部屋の期限が近いことを知らせる ---------- */
+function startExpiryWatch(room) {
+  stopExpiryWatch();
+  if (!room || !room.createdAt || typeof room.createdAt.toMillis !== "function") return;
+
+  const createdMs = room.createdAt.toMillis();
+  expiryWarningShown = false;
+
+  const check = () => {
+    const remaining = ROOM_EXPIRY_MS - (Date.now() - createdMs);
+    if (remaining <= 0) {
+      stopExpiryWatch();
+      return;
+    }
+    if (remaining <= ROOM_EXPIRY_WARNING_MS && !expiryWarningShown) {
+      expiryWarningShown = true;
+      const minutes = Math.ceil(remaining / 60000);
+      showErrorBanner(`この部屋はあと約${minutes}分で終了します。続ける場合は早めに進めてください。`, true);
+    }
+  };
+
+  check();
+  expiryCheckTimer = setInterval(check, 60 * 1000);
+}
+
+function stopExpiryWatch() {
+  if (expiryCheckTimer) {
+    clearInterval(expiryCheckTimer);
+    expiryCheckTimer = null;
+  }
 }
 
 /* ---------- エラーバナー ---------- */
@@ -100,6 +149,36 @@ function generateRoomCode() {
     code += ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)];
   }
   return code;
+}
+
+// 使われていない部屋コードを見つける(万が一の衝突に備えて数回リトライする)
+async function generateUniqueRoomCode() {
+  const MAX_ATTEMPTS = 5;
+  for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    const code = generateRoomCode();
+    const snap = await db.collection("rooms").doc(code).get();
+    if (!snap.exists) return code;
+  }
+  throw new Error("部屋コードの採番に失敗しました");
+}
+
+// 期限切れの部屋を検知したら、居座らせずに掃除しておく(簡易クリーンアップ)
+async function cleanupExpiredRoom(roomId) {
+  try {
+    const roomRef = db.collection("rooms").doc(roomId);
+    const [playersSnap, historySnap] = await Promise.all([
+      roomRef.collection("players").get(),
+      roomRef.collection("history").get()
+    ]);
+    const batch = db.batch();
+    playersSnap.forEach((doc) => batch.delete(doc.ref));
+    historySnap.forEach((doc) => batch.delete(doc.ref));
+    batch.delete(roomRef);
+    await batch.commit();
+  } catch (err) {
+    // 掃除に失敗しても致命的ではないので、握りつぶしてログだけ残す
+    console.error("期限切れ部屋の掃除に失敗しました", err);
+  }
 }
 
 function shuffle(arr) {
@@ -175,7 +254,7 @@ $("btn-create-room").addEventListener("click", async () => {
 
   try {
     await ensureSignedIn();
-    const roomId = generateRoomCode();
+    const roomId = await generateUniqueRoomCode();
 
     await db.collection("rooms").doc(roomId).set({
       hostUid: state.uid,
@@ -233,6 +312,14 @@ $("btn-join-room").addEventListener("click", async () => {
     }
     if (isRoomExpired(roomSnap.data())) {
       showHomeError("この部屋は作成から2時間以上経過しているため参加できません");
+      cleanupExpiredRoom(code);
+      return;
+    }
+
+    const existingPlayersSnap = await roomRef.collection("players").get();
+    if (existingPlayersSnap.size >= MAX_PLAYERS
+        && !existingPlayersSnap.docs.some((d) => d.id === state.uid)) {
+      showHomeError(`この部屋は満員です(最大${MAX_PLAYERS}人)`);
       return;
     }
 
@@ -313,7 +400,7 @@ function listenToPlayers() {
       snap.forEach((doc) => players.push({ id: doc.id, ...doc.data() }));
       state.playerCount = players.length;
 
-      $("lobby-count").textContent = `(${players.length})`;
+      $("lobby-count").textContent = `(${players.length}/${MAX_PLAYERS})`;
       $("lobby-player-list").innerHTML = players
         .map((p) => `<li>${escapeHtml(p.name)}</li>`)
         .join("");
@@ -410,6 +497,7 @@ function resetToHome() {
   sessionStorage.removeItem("kg_myName");
   state.roomId = null;
   state.isHost = false;
+  hideRoundIndicator();
   showScreen("screen-home");
 }
 
@@ -431,6 +519,8 @@ function listenToRoom() {
       state.isKing = room.kingUid === state.uid;
       state.playerCount = room.playerCount || state.playerCount;
       state.currentRound = room.round || 1;
+      updateRoundIndicator();
+      startExpiryWatch(room);
 
       // ラウンドの切り替わりを検知して、全員に一瞬の通知を出す
       if (state.lastRoomStatus === "command" && room.status === "waiting") {
@@ -651,6 +741,7 @@ function rerollTargets() {
 $("btn-send-command").addEventListener("click", async () => {
   const text = $("command-text").value.trim();
   if (!text) return;
+  if (!confirm(`この命令を全員に発表します。よろしいですか?\n\n「${text}」`)) return;
   $("btn-send-command").disabled = true;
 
   try {
@@ -712,6 +803,7 @@ function cleanupListeners() {
   if (state.unsubPlayers) state.unsubPlayers();
   if (state.unsubMe) state.unsubMe();
   if (state.unsubHistory) state.unsubHistory();
+  stopExpiryWatch();
 }
 
 /* ==========================================================
@@ -734,7 +826,10 @@ function cleanupListeners() {
         if (doc.exists && !isRoomExpired(doc.data())) {
           enterLobby();
         } else {
-          if (doc.exists) showErrorBanner("この部屋は作成から2時間以上経過したため終了しました", true);
+          if (doc.exists) {
+            showErrorBanner("この部屋は作成から2時間以上経過したため終了しました", true);
+            cleanupExpiredRoom(savedRoomId);
+          }
           resetToHome();
         }
       }).catch((err) => {
