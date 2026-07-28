@@ -3,85 +3,139 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>宴会ブラックジャック - あそびかたを選ぶ</title>
+<title>宴会ブラックジャック</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-<link href="css/common.css" rel="stylesheet">
-<style>
-  .mode-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    margin-top: 1.4rem;
-  }
-  .mode-card {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    background: rgba(243,234,210,0.05);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 1.1rem 1.3rem;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-  }
-  .mode-card:hover {
-    transform: translateY(-2px);
-    background: rgba(243,234,210,0.1);
-    border-color: var(--gold);
-  }
-  .mode-card h3 {
-    margin: 0 0 0.3rem;
-    font-family: var(--font-display);
-    color: var(--gold-soft);
-    font-size: 1.1rem;
-  }
-  .mode-card p {
-    margin: 0;
-    font-size: 0.85rem;
-    color: rgba(243,234,210,0.75);
-  }
-  .back-link {
-    display: inline-block;
-    margin-top: 1.6rem;
-    font-size: 0.85rem;
-    color: rgba(243,234,210,0.6);
-    text-decoration: none;
-  }
-  .back-link:hover { color: var(--gold-soft); }
-</style>
+<link href="../css/style.css" rel="stylesheet">
 </head>
 <body>
 
 <div class="lantern-glow" aria-hidden="true"></div>
 
 <header class="site-header">
-  <p class="eyebrow">遊び方を選んでね</p>
+  <p class="eyebrow">宴会対応・2〜8人プレイ</p>
   <h1>🏮 宴会ブラックジャック 🏮</h1>
 </header>
 
 <main id="app">
-  <div class="panel">
-    <h2>モードを選択</h2>
-    <p class="hint">みんなでどう遊ぶかに合わせて選んでください。</p>
 
-    <div class="mode-list">
-      <a class="mode-card" href="html/index.html">
-        <h3>📱 1台で遊ぶ版</h3>
-        <p>1つの端末をみんなで回して遊ぶ、シンプルなバージョンです。</p>
-      </a>
-      <a class="mode-card" href="html/host.html">
-        <h3>🖥️ ホスト画面(共有スクリーン用)</h3>
-        <p>テレビやPCなど、みんなで見る画面として開いてください。</p>
-      </a>
-      <a class="mode-card" href="html/player.html">
-        <h3>📲 プレイヤー画面(自分のスマホ用)</h3>
-        <p>各自のスマホでルームコードを入力して参加します。</p>
-      </a>
+  <!-- ============ 設定画面 ============ -->
+  <section id="screen-setup" class="screen screen--active">
+    <div class="panel">
+      <h2>参加人数を決めよう</h2>
+      <div class="stepper">
+        <button id="btnMinus" type="button" aria-label="減らす">−</button>
+        <span id="playerCountDisplay">4</span>
+        <button id="btnPlus" type="button" aria-label="増やす">＋</button>
+      </div>
+      <p class="hint">2〜8人まで対応してるよ</p>
+
+      <div id="nameInputs" class="name-grid"></div>
+
+      <details class="edit-lists">
+        <summary>ミニイベント・罰ゲームみくじの内容を編集する</summary>
+        <label>ちょうちんタイム(ミニイベント)一覧 — 1行に1つ
+          <textarea id="eventListInput" rows="6"></textarea>
+        </label>
+        <label>罰ゲームみくじ一覧 — 1行に1つ
+          <textarea id="penaltyListInput" rows="6"></textarea>
+        </label>
+      </details>
+
+      <button id="btnStart" class="btn btn--primary" type="button">ゲーム開始</button>
+    </div>
+  </section>
+
+  <!-- ============ ゲーム画面 ============ -->
+  <section id="screen-game" class="screen">
+    <div class="round-bar">
+      <span id="roundLabel">ラウンド 1</span>
+      <span id="turnLabel" class="turn-label"></span>
     </div>
 
-    <a class="back-link" href="../index.html">← ゲームセンターに戻る</a>
-  </div>
+    <div class="table-felt">
+      <div class="hand hand--dealer">
+        <h3>ディーラー <span id="dealerTotal" class="total-chip"></span></h3>
+        <div id="dealerCards" class="card-row"></div>
+      </div>
+
+      <div class="hand hand--active">
+        <div class="active-header">
+          <h3 id="activePlayerName">-</h3>
+          <div id="activeBadges" class="badges"></div>
+        </div>
+        <div id="activeCards" class="card-row card-row--large"></div>
+        <p class="total-line">合計 <span id="activeTotal" class="total-chip"></span></p>
+
+        <div class="actions">
+          <button id="btnHit" class="btn btn--gold" type="button">引く</button>
+          <button id="btnStand" class="btn" type="button">勝負する</button>
+          <button id="btnJoker" class="btn btn--ghost hidden" type="button">🎭 ジョーカーを使う</button>
+          <button id="btnSwap" class="btn btn--ghost hidden" type="button">🔄 交換チケットを使う</button>
+        </div>
+      </div>
+
+      <div id="benchList" class="bench"></div>
+    </div>
+  </section>
+
+  <!-- ============ 結果画面 ============ -->
+  <section id="screen-result" class="screen">
+    <div class="panel">
+      <h2>🏮 結果発表 🏮</h2>
+      <p>ディーラー 合計 <span id="resultDealerTotal" class="total-chip"></span></p>
+      <ul id="resultList" class="result-list"></ul>
+      <div class="actions">
+        <button id="btnReplayRound" class="btn btn--primary" type="button">同じメンバーでもう1回</button>
+        <button id="btnReplayAll" class="btn" type="button">最初からやり直す</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
+<!-- カード効果トースト -->
+<div id="effectToast" class="toast"></div>
+
+<!-- ミニイベント モーダル -->
+<div id="modalEvent" class="modal-overlay hidden">
+  <div class="modal lantern-card">
+    <p class="modal-eyebrow">🏮 ちょうちんタイム 🏮</p>
+    <p id="eventPlayerName" class="modal-target"></p>
+    <p id="eventText" class="modal-text"></p>
+    <p class="timer"><span id="eventTimer">15</span></p>
+    <div class="actions">
+      <button id="btnEventSuccess" class="btn btn--gold" type="button">成功!</button>
+      <button id="btnEventFail" class="btn btn--red" type="button">できなかった…</button>
+    </div>
+  </div>
+</div>
+
+<!-- 罰ゲームみくじ モーダル -->
+<div id="modalPenalty" class="modal-overlay hidden">
+  <div class="modal omikuji-modal">
+    <p class="modal-eyebrow">罰ゲームみくじ</p>
+    <p id="penaltyTarget" class="modal-target"></p>
+    <div id="omikujiBox" class="omikuji-box">
+      <span class="omikuji-box__lid">🪵</span>
+      <p class="omikuji-box__hint">箱をタップして引く</p>
+    </div>
+    <p id="penaltyResult" class="omikuji-slip hidden"></p>
+    <div class="actions">
+      <button id="btnPenaltyClose" class="btn btn--primary hidden" type="button">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- 交換チケット用モーダル -->
+<div id="modalSwap" class="modal-overlay hidden">
+  <div class="modal">
+    <p class="modal-eyebrow">🔄 交換する相手を選ぼう</p>
+    <div id="swapTargets" class="swap-targets"></div>
+    <button id="btnSwapCancel" class="btn" type="button">やめる</button>
+  </div>
+</div>
+
+<script src="../js/script.js"></script>
 </body>
 </html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宴会ブラックジャック - あそびかたを選ぶ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="css/common.css" rel="stylesheet">
+<style>
+  .mode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.4rem;
+  }
+  .mode-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: rgba(243,234,210,0.05);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 1.1rem 1.3rem;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .mode-card:hover {
+    transform: translateY(-2px);
+    background: rgba(243,234,210,0.1);
+    border-color: var(--gold);
+  }
+  .mode-card h3 {
+    margin: 0 0 0.3rem;
+    font-family: var(--font-display);
+    color: var(--gold-soft);
+    font-size: 1.1rem;
+  }
+  .mode-card p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgba(243,234,210,0.75);
+  }
+  .back-link {
+    display: inline-block;
+    margin-top: 1.6rem;
+    font-size: 0.85rem;
+    color: rgba(243,234,210,0.6);
+    text-decoration: none;
+  }
+  .back-link:hover { color: var(--gold-soft); }
+</style>
+</head>
+<body>
+
+<div class="lantern-glow" aria-hidden="true"></div>
+
+<header class="site-header">
+  <p class="eyebrow">遊び方を選んでね</p>
+  <h1>🏮 宴会ブラックジャック 🏮</h1>
+</header>
+
+<main id="app">
+  <div class="panel">
+    <h2>モードを選択</h2>
+    <p class="hint">みんなでどう遊ぶかに合わせて選んでください。</p>
+
+    <div class="mode-list">
+      <a class="mode-card" href="html/index.html">
+        <h3>📱 1台で遊ぶ版</h3>
+        <p>1つの端末をみんなで回して遊ぶ、シンプルなバージョンです。</p>
+      </a>
+      <a class="mode-card" href="html/host.html">
+        <h3>🖥️ ホスト画面(共有スクリーン用)</h3>
+        <p>テレビやPCなど、みんなで見る画面として開いてください。</p>
+      </a>
+      <a class="mode-card" href="html/player.html">
+        <h3>📲 プレイヤー画面(自分のスマホ用)</h3>
+        <p>各自のスマホでルームコードを入力して参加します。</p>
+      </a>
+    </div>
+
+    <a class="back-link" href="../index.html">← ゲームセンターに戻る</a>
+  </div>
+</main>
+
+</body>
+</html>
