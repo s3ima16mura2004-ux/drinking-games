@@ -4,10 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0b132b">
+    <!-- ホーム画面に追加した時、ブラウザのアドレスバー無しでアプリっぽく開けるように -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>宴のロシアンルーレット</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+    <!-- iPhoneは振動非対応なので、当たった瞬間の画面フラッシュで体感を補完 -->
+    <div class="hit-flash" id="hitFlash"></div>
 
     <div class="app-content">
 
@@ -38,10 +45,27 @@
 
                 <div class="option-group">
                     <h3>弾の数を選ぼう</h3>
-                    <div class="chamber-select" id="chamberSelect">
+                    <div class="chamber-select">
                         <button class="chamber-btn" data-count="3" onclick="selectChamberCount(3)">3発<br><span>ハイリスク</span></button>
                         <button class="chamber-btn active" data-count="6" onclick="selectChamberCount(6)">6発<br><span>標準</span></button>
                         <button class="chamber-btn" data-count="8" onclick="selectChamberCount(8)">8発<br><span>のんびり</span></button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <h3>罰ゲームのジャンルを選ぼう <span style="color:#aaa; font-weight:normal; font-size:12px;">(複数選択可)</span></h3>
+                    <div class="chamber-select" id="categorySelect">
+                        <button class="chamber-btn active" data-cat="drink" onclick="toggleCategory('drink')">🍻<br><span>お酒系</span></button>
+                        <button class="chamber-btn active" data-cat="talk" onclick="toggleCategory('talk')">🗣️<br><span>トーク系</span></button>
+                        <button class="chamber-btn active" data-cat="dare" onclick="toggleCategory('dare')">🎭<br><span>無茶ぶり系</span></button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <h3>罰ゲームの決め方</h3>
+                    <div class="chamber-select" id="modeSelect">
+                        <button class="chamber-btn active" data-mode="random" onclick="selectPenaltyMode('random')">🎲<br><span>ランダム</span></button>
+                        <button class="chamber-btn" data-mode="neighbor" onclick="selectPenaltyMode('neighbor')">🙋<br><span>次の人が決める</span></button>
                     </div>
                 </div>
 
@@ -57,13 +81,22 @@
 
             <!-- 【ステップ2】 ゲーム本番画面 -->
             <div class="card-box" id="gameScreen" style="display: none;">
+                <button class="settings-link" onclick="backToSetup()">⚙️ 設定に戻る</button>
+
                 <div class="turn-indicator" id="turnIndicator">プレイヤー1の番</div>
 
                 <div id="comboBanner" class="combo-banner"></div>
 
-                <div class="status" id="status">🥃</div>
+                <!-- 弾倉が実際に回転するSVGビジュアル -->
+                <div class="cylinder-wrap">
+                    <div id="cylinderSvgContainer"></div>
+                    <div class="status" id="status">🥃</div>
+                </div>
 
                 <div id="message">順番に引き金を引いてね...</div>
+
+                <!-- 「次の人が決める」モード用の罰ゲーム選択UI -->
+                <div id="penaltyPicker" class="penalty-picker" style="display:none;"></div>
 
                 <div id="resultSummary" class="result-summary" style="display:none;"></div>
             </div>
