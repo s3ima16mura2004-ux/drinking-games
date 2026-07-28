@@ -5,6 +5,9 @@ let totalChambers = 6;
 let bulletPosition = Math.floor(Math.random() * totalChambers);
 let currentAttempt = 0;
 let isAnimating = false;
+let consecutiveSafe = 0;
+let survivalCount = [];
+let hitPlayerIndex = null;
 
 const penalties = [
     // 飲み系
@@ -29,6 +32,9 @@ const penalties = [
     "次の1分間、一切の笑い（表情・声）を禁止される"
 ];
 
+// ユーザーが追加したオリジナル罰ゲーム
+let customPenalties = [];
+
 // 初期化：名前入力欄を作る
 function updateNameInputs() {
     const container = document.getElementById("nameInputsContainer");
@@ -51,6 +57,39 @@ function changeCount(amount) {
     updateNameInputs();
 }
 
+// 弾数選択
+function selectChamberCount(count) {
+    totalChambers = count;
+    document.querySelectorAll(".chamber-btn").forEach(btn => {
+        btn.classList.toggle("active", parseInt(btn.dataset.count) === count);
+    });
+}
+
+// オリジナル罰ゲーム追加
+function addCustomPenalty() {
+    const input = document.getElementById("customPenaltyInput");
+    const text = input.value.trim();
+    if (!text) return;
+    customPenalties.push(text);
+    input.value = "";
+    renderCustomPenaltyList();
+}
+
+function removeCustomPenalty(index) {
+    customPenalties.splice(index, 1);
+    renderCustomPenaltyList();
+}
+
+function renderCustomPenaltyList() {
+    const list = document.getElementById("customPenaltyList");
+    list.innerHTML = "";
+    customPenalties.forEach((text, i) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<span>${text}</span><button onclick="removeCustomPenalty(${i})" aria-label="削除">×</button>`;
+        list.appendChild(li);
+    });
+}
+
 function startGame() {
     const inputs = document.querySelectorAll(".name-input");
     players = [];
@@ -60,11 +99,21 @@ function startGame() {
 
     currentTurnIndex = 0;
     currentAttempt = 0;
+    consecutiveSafe = 0;
+    hitPlayerIndex = null;
+    survivalCount = new Array(players.length).fill(0);
     bulletPosition = Math.floor(Math.random() * totalChambers);
 
     document.getElementById("setupScreen").style.display = "none";
     document.getElementById("gameScreen").style.display = "block";
-    
+    document.getElementById("resultSummary").style.display = "none";
+    document.getElementById("comboBanner").classList.remove("show");
+
+    // 下部固定バーのボタンを「引き金を引く」に切り替え
+    document.getElementById("startBtn").style.display = "none";
+    document.getElementById("shootBtn").style.display = "block";
+    document.getElementById("restartBtn").style.display = "none";
+
     updateTurnDisplay();
 }
 
@@ -82,7 +131,35 @@ function pullTrigger() {
     const message = document.getElementById("message");
     const btn = document.getElementById("shootBtn");
 
-    // クルッと回るアニメーションを付与
+    btn.disabled = true;
+    message.innerText = "";
+    status.classList.remove("spinning");
+
+    // カウントダウン演出：3→2→1→結果
+    let count = 3;
+    status.classList.add("count-pulse");
+    status.innerText = count;
+
+    const countdownTimer = setInterval(() => {
+        count--;
+        if (count > 0) {
+            status.classList.remove("count-pulse");
+            void status.offsetWidth; // リフローを強制してアニメーションを再生
+            status.classList.add("count-pulse");
+            status.innerText = count;
+        } else {
+            clearInterval(countdownTimer);
+            status.classList.remove("count-pulse");
+            revealResult();
+        }
+    }, 500);
+}
+
+function revealResult() {
+    const status = document.getElementById("status");
+    const message = document.getElementById("message");
+    const btn = document.getElementById("shootBtn");
+
     status.classList.add("spinning");
     status.innerText = "🔄";
 
@@ -92,29 +169,34 @@ function pullTrigger() {
         if (currentAttempt === bulletPosition) {
             // 当たり！
             status.innerText = "💥";
-            let randomPenalty = penalties[Math.floor(Math.random() * penalties.length)];
+            if (navigator.vibrate) navigator.vibrate([120, 60, 220]);
+
+            const allPenalties = penalties.concat(customPenalties);
+            let randomPenalty = allPenalties[Math.floor(Math.random() * allPenalties.length)];
             message.innerHTML = `<span style="color:#ff6b6b;">${players[currentTurnIndex]} が当たり！</span><br>罰ゲーム：${randomPenalty}`;
-            btn.disabled = true;
-            
-            // ⬇️ 追加：もう一度遊ぶボタンを表示する
-            document.getElementById("restartBtn").style.display = "block";
+
+            hitPlayerIndex = currentTurnIndex;
+            consecutiveSafe = 0;
+            endGame();
         } else {
             // セーフ
             status.innerText = "💨";
             message.innerText = `${players[currentTurnIndex]} はセーフ！生き残った！`;
+            survivalCount[currentTurnIndex]++;
+            consecutiveSafe++;
+            showComboIfNeeded();
             currentAttempt++;
 
             if (currentAttempt >= totalChambers) {
                 message.innerText = "全員生き残った……奇跡のセーフ！";
-                btn.disabled = true;
-                
-                // ⬇️ 追加：もう一度遊ぶボタンを表示する
-                document.getElementById("restartBtn").style.display = "block";
+                endGame();
+                return;
             } else {
                 // 次の人へ
                 currentTurnIndex = (currentTurnIndex + 1) % players.length;
                 setTimeout(() => {
                     updateTurnDisplay();
+                    btn.disabled = false;
                     isAnimating = false;
                 }, 1500);
                 return;
@@ -124,16 +206,63 @@ function pullTrigger() {
     }, 600);
 }
 
+// 連続セーフのコンボ演出
+function showComboIfNeeded() {
+    if (consecutiveSafe < 2) return; // 2連続以上から演出
+
+    const banner = document.getElementById("comboBanner");
+    const messages = {
+        2: "🔥 2連続セーフ！空気が張り詰めてきた…",
+        3: "😱 3連続セーフ！誰の心臓ももたない…！",
+        4: "🌪️ 4連続セーフ！伝説の回になるか…！？"
+    };
+    const text = messages[consecutiveSafe] || `⚡ ${consecutiveSafe}連続セーフ！！奇跡が続いている…！`;
+
+    banner.innerText = text;
+    banner.classList.remove("show");
+    void banner.offsetWidth;
+    banner.classList.add("show");
+}
+
+// ゲーム終了時のMVP・記録表示
+function endGame() {
+    document.getElementById("shootBtn").style.display = "none";
+    document.getElementById("restartBtn").style.display = "block";
+
+    const summary = document.getElementById("resultSummary");
+
+    // 生存数が最も多いプレイヤー（＝運が良かった人）を集計
+    let maxSurvive = Math.max(...survivalCount);
+    let mvpNames = players.filter((_, i) => survivalCount[i] === maxSurvive && maxSurvive > 0);
+
+    let html = `<h3>🏆 今回の記録</h3>`;
+    if (hitPlayerIndex !== null) {
+        html += `<p>💥 散った者：<strong>${players[hitPlayerIndex]}</strong></p>`;
+    }
+    if (mvpNames.length > 0) {
+        html += `<p>🍀 最も強運だったのは：<strong>${mvpNames.join("、")}</strong>（${maxSurvive}回セーフ）</p>`;
+    }
+
+    summary.innerHTML = html;
+    summary.style.display = "block";
+}
+
 // 「もう一度遊ぶ」ボタンが押されたときの処理
 function resetGame() {
     currentTurnIndex = 0;
     currentAttempt = 0;
+    consecutiveSafe = 0;
+    hitPlayerIndex = null;
+    survivalCount = new Array(players.length).fill(0);
     bulletPosition = Math.floor(Math.random() * totalChambers);
-    
+
     // ボタンやステータスを初期状態に戻す
     document.getElementById("shootBtn").disabled = false;
+    document.getElementById("shootBtn").style.display = "block";
     document.getElementById("restartBtn").style.display = "none";
-    
+    document.getElementById("resultSummary").style.display = "none";
+    document.getElementById("comboBanner").classList.remove("show");
+
     updateTurnDisplay();
 }
 

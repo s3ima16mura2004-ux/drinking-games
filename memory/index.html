@@ -2,17 +2,25 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#120318">
     <title>宴の罰ゲーム神経衰弱</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=RocknRoll+One&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <div>
+    <div class="top-bar">
         <a href="../index.html" class="menu-link">⬅ メニューに戻る</a>
     </div>
 
-    <div class="subtitle">宴の記憶力勝負</div>
-    <h1>罰ゲーム神経衰弱</h1>
+    <header class="game-header">
+        <div class="eyebrow">🏮 宴会場・特設会場 🍶</div>
+        <div class="subtitle">宴の記憶力勝負</div>
+        <h1 class="neon-title" data-text="罰ゲーム神経衰弱">罰ゲーム神経衰弱</h1>
+    </header>
 
     <!-- 【ステップ1】 設定画面 -->
     <div class="card-box" id="setupScreen">
@@ -22,7 +30,7 @@
             <label>参加人数</label>
             <div class="control-row">
                 <button class="count-btn" onclick="changePlayerCount(-1)">−</button>
-                <span id="playerCountText" style="font-size: 22px; font-weight: bold;">2</span>
+                <span id="playerCountText" class="count-display">2</span>
                 <button class="count-btn" onclick="changePlayerCount(1)">＋</button>
             </div>
         </div>
@@ -31,12 +39,26 @@
             <label>難易度（ペアの数）</label>
             <div class="difficulty-buttons">
                 <button class="diff-btn active" onclick="setDifficulty(4, this)">4ペア (8枚)</button>
-                <button class="diff-btn" onclick="setDifficulty(6, this)">6ペア (12枚)</button>
-                <button class="diff-btn" onclick="setDifficulty(8, this)">8ペア (16枚)</button>
+                <button class="diff-btn" onclick="setDifficulty(6, this)">6ペア (12枚) 👑</button>
+                <button class="diff-btn" onclick="setDifficulty(8, this)">8ペア (16枚) 👑🔄</button>
             </div>
+            <div class="hint-text">👑王様カード＝6ペア以上、🔄シャッフルカード＝8ペア以上で登場</div>
         </div>
         
         <div id="nameInputsContainer" class="name-inputs"></div>
+
+        <div class="setting-group">
+            <label>音声・振動演出</label>
+            <label class="toggle-label">
+                <input type="checkbox" id="voiceToggle" checked>
+                🔊 イベントを音声で読み上げる
+            </label>
+        </div>
+
+        <div class="setting-group">
+            <label>カスタム罰ゲーム編集（1行につき1つ／空欄ならデフォルトを使用）</label>
+            <textarea id="customPenaltyInput" class="penalty-textarea" placeholder="例）一気飲み&#10;変な顔で自撮り&#10;好きな人の名前を叫ぶ"></textarea>
+        </div>
 
         <button class="action-btn" onclick="startGame()">ゲーム開始</button>
     </div>
@@ -44,17 +66,17 @@
     <!-- 【ステップ2】 ゲーム本番画面 -->
     <div class="card-box" id="gameScreen" style="display: none;">
         <div class="info-bar">
-            <span id="turnIndicator" style="color: #f9d423; font-weight: bold;">プレイヤー1の番</span>
-            <span id="timerBox" style="color: #ff6b6b; font-weight: bold;">残り: 10秒</span>
+            <span id="turnIndicator" class="turn-indicator">プレイヤー1の番</span>
+            <span id="timerBox" class="timer-box">残り: 10秒</span>
         </div>
         
-        <div id="scoreBoard" style="color: #aaa; font-size: 13px; margin-bottom: 10px;">スコア: 0</div>
+        <div id="scoreBoard" class="score-board">スコア: 0</div>
 
         <div class="grid" id="board"></div>
         
-        <div id="eventMessage" style="color: #aaa;">カードをめくってね</div>
+        <div id="eventMessage" class="event-message">カードをめくってね</div>
 
-        <button class="action-btn" id="restartBtn" onclick="returnToSetup()" style="display: none; margin-top: 15px; background: #2ecc71; color: #fff;">設定に戻る</button>
+        <button class="action-btn restart-btn" id="restartBtn" onclick="returnToSetup()" style="display: none;">設定に戻る</button>
     </div>
 
     <script src="script.js"></script>
