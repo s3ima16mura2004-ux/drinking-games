@@ -11,57 +11,63 @@
 
     <div class="app-content">
 
-        <div>
-            <a href="../index.html" class="menu-link">⬅ メニューに戻る</a>
+        <div class="page-header">
+            <div>
+                <a href="../index.html" class="menu-link">⬅ メニューに戻る</a>
+            </div>
+
+            <div class="subtitle">宴の運試し</div>
+            <h1>ロシアンルーレット</h1>
         </div>
 
-        <div class="subtitle">宴の運試し</div>
-        <h1>ロシアンルーレット</h1>
+        <div class="screen-wrapper">
 
-        <!-- 【ステップ1】 参加人数＆プレイヤー名入力画面 -->
-        <div class="card-box" id="setupScreen">
-            <h2>参加人数を決めよう</h2>
-            <div class="player-count-control">
-                <button class="count-btn" onclick="changeCount(-1)">−</button>
-                <span id="playerCountText" style="font-size: 32px; font-weight: bold;">3</span>
-                <button class="count-btn" onclick="changeCount(1)">＋</button>
-            </div>
-            <p style="color: #aaa; font-size: 14px; margin-bottom: 20px;">2〜8人まで対応してるよ</p>
+            <!-- 【ステップ1】 参加人数＆プレイヤー名入力画面 -->
+            <div class="card-box" id="setupScreen">
+                <h2>参加人数を決めよう</h2>
+                <div class="player-count-control">
+                    <button class="count-btn" onclick="changeCount(-1)">−</button>
+                    <span id="playerCountText" style="font-size: 32px; font-weight: bold;">3</span>
+                    <button class="count-btn" onclick="changeCount(1)">＋</button>
+                </div>
+                <p style="color: #aaa; font-size: 14px; margin-bottom: 20px;">2〜8人まで対応してるよ</p>
 
-            <div id="nameInputsContainer" class="name-inputs">
-                <!-- JavaScriptで動的に生成されます -->
-            </div>
+                <div id="nameInputsContainer" class="name-inputs">
+                    <!-- JavaScriptで動的に生成されます -->
+                </div>
 
-            <div class="option-group">
-                <h3>弾の数を選ぼう</h3>
-                <div class="chamber-select" id="chamberSelect">
-                    <button class="chamber-btn" data-count="3" onclick="selectChamberCount(3)">3発<br><span>ハイリスク</span></button>
-                    <button class="chamber-btn active" data-count="6" onclick="selectChamberCount(6)">6発<br><span>標準</span></button>
-                    <button class="chamber-btn" data-count="8" onclick="selectChamberCount(8)">8発<br><span>のんびり</span></button>
+                <div class="option-group">
+                    <h3>弾の数を選ぼう</h3>
+                    <div class="chamber-select" id="chamberSelect">
+                        <button class="chamber-btn" data-count="3" onclick="selectChamberCount(3)">3発<br><span>ハイリスク</span></button>
+                        <button class="chamber-btn active" data-count="6" onclick="selectChamberCount(6)">6発<br><span>標準</span></button>
+                        <button class="chamber-btn" data-count="8" onclick="selectChamberCount(8)">8発<br><span>のんびり</span></button>
+                    </div>
+                </div>
+
+                <div class="option-group">
+                    <h3>オリジナル罰ゲームを追加 <span style="color:#aaa; font-weight:normal; font-size:12px;">(任意)</span></h3>
+                    <div class="custom-penalty-row">
+                        <input type="text" id="customPenaltyInput" class="name-input" placeholder="例：モノマネを1つ披露する" style="margin-bottom:0;">
+                        <button class="add-btn" onclick="addCustomPenalty()">追加</button>
+                    </div>
+                    <ul id="customPenaltyList" class="custom-penalty-list"></ul>
                 </div>
             </div>
 
-            <div class="option-group">
-                <h3>オリジナル罰ゲームを追加 <span style="color:#aaa; font-weight:normal; font-size:12px;">(任意)</span></h3>
-                <div class="custom-penalty-row">
-                    <input type="text" id="customPenaltyInput" class="name-input" placeholder="例：モノマネを1つ披露する" style="margin-bottom:0;">
-                    <button class="add-btn" onclick="addCustomPenalty()">追加</button>
-                </div>
-                <ul id="customPenaltyList" class="custom-penalty-list"></ul>
+            <!-- 【ステップ2】 ゲーム本番画面 -->
+            <div class="card-box" id="gameScreen" style="display: none;">
+                <div class="turn-indicator" id="turnIndicator">プレイヤー1の番</div>
+
+                <div id="comboBanner" class="combo-banner"></div>
+
+                <div class="status" id="status">🥃</div>
+
+                <div id="message">順番に引き金を引いてね...</div>
+
+                <div id="resultSummary" class="result-summary" style="display:none;"></div>
             </div>
-        </div>
 
-        <!-- 【ステップ2】 ゲーム本番画面 -->
-        <div class="card-box" id="gameScreen" style="display: none;">
-            <div class="turn-indicator" id="turnIndicator">プレイヤー1の番</div>
-
-            <div id="comboBanner" class="combo-banner"></div>
-
-            <div class="status" id="status">🥃</div>
-
-            <div id="message">順番に引き金を引いてね...</div>
-
-            <div id="resultSummary" class="result-summary" style="display:none;"></div>
         </div>
 
     </div>
