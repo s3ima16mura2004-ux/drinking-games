@@ -16,6 +16,24 @@
   <div class="lantern lantern-b"></div>
   <div class="lantern lantern-c"></div>
   <div class="stars"></div>
+  <div class="season-fx">
+    <span class="fx-particle fx-sakura p1"></span>
+    <span class="fx-particle fx-sakura p2"></span>
+    <span class="fx-particle fx-sakura p3"></span>
+    <span class="fx-particle fx-sakura p4"></span>
+    <span class="fx-particle fx-snow p1"></span>
+    <span class="fx-particle fx-snow p2"></span>
+    <span class="fx-particle fx-snow p3"></span>
+    <span class="fx-particle fx-snow p4"></span>
+    <span class="fx-particle fx-leaf p1"></span>
+    <span class="fx-particle fx-leaf p2"></span>
+    <span class="fx-particle fx-leaf p3"></span>
+    <span class="fx-particle fx-leaf p4"></span>
+    <span class="fx-particle fx-ember p1"></span>
+    <span class="fx-particle fx-ember p2"></span>
+    <span class="fx-particle fx-ember p3"></span>
+    <span class="fx-particle fx-ember p4"></span>
+  </div>
 </div>
 
 <div id="error-banner" class="error-banner" role="alert" hidden>
@@ -27,6 +45,17 @@
   <p class="eyebrow">宴の抽選所</p>
   <h1 class="brand">王様ゲーム</h1>
   <p id="round-indicator" class="round-indicator" hidden></p>
+  <div class="header-controls">
+    <button id="btn-toggle-sound" class="icon-btn" type="button" aria-label="サウンドの切り替え">🔔</button>
+    <select id="theme-select" class="theme-select" aria-label="テーマを選ぶ">
+      <option value="auto">🎨 自動(季節)</option>
+      <option value="night">🏮 常夜</option>
+      <option value="spring">🌸 春</option>
+      <option value="summer">🎆 夏</option>
+      <option value="autumn">🍁 秋</option>
+      <option value="winter">❄️ 冬</option>
+    </select>
+  </div>
 </header>
 
 <main id="app" class="app-shell">
@@ -114,11 +143,30 @@
         </div>
       </div>
       <p id="draw-wait-note" class="hint-text">まもなく発表されます…</p>
+      <p id="draw-thinking-note" class="hint-text" hidden>👑 王様が命令を考え中です…</p>
+    </div>
+
+    <!-- 投票制で命令テンプレートを決める場合のパネル(王様・参加者どちらにも表示) -->
+    <div id="vote-panel" class="card" hidden>
+      <h2 class="card-title">📊 命令をみんなで投票</h2>
+      <ul id="vote-options-list" class="vote-options-list"></ul>
+      <div id="vote-king-controls" class="host-controls" hidden>
+        <button id="btn-close-vote" class="btn btn-primary">投票を締め切って決定する</button>
+        <button id="btn-cancel-vote" class="btn btn-ghost btn-small">投票をやめて自分で選ぶ</button>
+      </div>
+      <p id="vote-guest-note" class="hint-text" hidden>王様が投票を締め切るのを待っています…</p>
     </div>
 
     <!-- 王様だけに見える命令フォーム -->
     <div id="king-command-panel" class="card" hidden>
       <h2 class="card-title">👑 王様の命令</h2>
+
+      <div class="mode-toggle">
+        <button id="btn-mode-manual" class="mode-toggle-btn is-active" type="button">自分で選ぶ</button>
+        <button id="btn-mode-vote" class="mode-toggle-btn" type="button">みんなで投票する</button>
+      </div>
+
+      <div id="manual-template-block">
       <label class="field-label" for="template-select">お題テンプレート</label>
       <select id="template-select" class="text-input">
         <option value="">-- 選ぶ --</option>
@@ -136,6 +184,7 @@
       </div>
 
       <button id="btn-reroll" class="btn btn-ghost btn-small" hidden>番号をランダムに引き直す</button>
+      </div>
 
       <label class="field-label" for="command-text">命令内容(自由に編集できます)</label>
       <textarea id="command-text" class="text-input textarea-input" rows="3" placeholder="例: ①番の人が一発ギャグをする"></textarea>
@@ -151,7 +200,13 @@
       <div class="command-scroll">
         <p id="command-display" class="command-display"></p>
       </div>
+      <button id="btn-speak-command" class="btn btn-ghost btn-small">🔊 読み上げる</button>
       <p class="hint-text">あなたは <strong id="command-my-number"></strong>番でした</p>
+
+      <div class="weak-vote-block">
+        <button id="btn-weak-vote" class="btn btn-ghost btn-small" hidden>😅 ちょっと弱いかも</button>
+        <p id="weak-vote-count" class="hint-text"></p>
+      </div>
 
       <div id="command-host-controls" class="host-controls" hidden>
         <button id="btn-next-round" class="btn btn-primary">もう一度くじを引く</button>

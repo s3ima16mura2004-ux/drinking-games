@@ -34,6 +34,9 @@ const state = {
   isKing: false,
   currentRound: 1,
   lastRoomStatus: null,
+  enteredDrawRound: null,
+  appliedResolvedVoteIndex: null,
+  lastAnnouncedKey: null,
   unsubRoom: null,
   unsubPlayers: null,
   unsubMe: null,
@@ -64,6 +67,113 @@ function hideRoundIndicator() {
   const el = $("round-indicator");
   if (el) el.hidden = true;
 }
+
+/* ---------- 設定: サウンド / バイブのON-OFF ---------- */
+let soundEnabled = localStorage.getItem("kg_soundEnabled") !== "0";
+
+function applySoundButtonLabel() {
+  const btn = $("btn-toggle-sound");
+  if (btn) btn.textContent = soundEnabled ? "🔔" : "🔕";
+}
+
+$("btn-toggle-sound").addEventListener("click", () => {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem("kg_soundEnabled", soundEnabled ? "1" : "0");
+  applySoundButtonLabel();
+});
+applySoundButtonLabel();
+
+// 命令発表の瞬間に鳴らす軽い効果音(外部音声ファイル不要、WebAudioでその場生成)+ バイブ
+function playCommandRevealEffect() {
+  if (!soundEnabled) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) {
+      const ctx = new Ctx();
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.25);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.5, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.45);
+      osc.onended = () => ctx.close();
+    }
+  } catch (err) {
+    console.error(err);
+  }
+  if (navigator.vibrate) {
+    try { navigator.vibrate([90, 40, 90]); } catch (err) { /* 対応していない端末は無視 */ }
+  }
+}
+
+/* ---------- 設定: 季節テーマ切り替え ---------- */
+const SEASON_BY_MONTH = {
+  1: "winter", 2: "winter", 3: "spring", 4: "spring", 5: "spring",
+  6: "summer", 7: "summer", 8: "summer", 9: "autumn", 10: "autumn",
+  11: "autumn", 12: "winter"
+};
+
+function currentSeasonTheme() {
+  return SEASON_BY_MONTH[new Date().getMonth() + 1] || "night";
+}
+
+function applyTheme(choice) {
+  const resolved = choice === "auto" ? currentSeasonTheme() : choice;
+  if (resolved === "night") {
+    delete document.documentElement.dataset.theme;
+  } else {
+    document.documentElement.dataset.theme = resolved;
+  }
+}
+
+(function initTheme() {
+  const savedTheme = localStorage.getItem("kg_theme") || "auto";
+  const select = $("theme-select");
+  if (select) select.value = savedTheme;
+  applyTheme(savedTheme);
+})();
+
+$("theme-select").addEventListener("change", () => {
+  const value = $("theme-select").value;
+  localStorage.setItem("kg_theme", value);
+  applyTheme(value);
+});
+
+/* ---------- オンライン状況(プレゼンス表示) ---------- */
+const PRESENCE_INTERVAL_MS = 12000;
+const PRESENCE_ONLINE_THRESHOLD_MS = 25000;
+let presenceTimer = null;
+
+function pingPresence() {
+  if (!state.roomId || !state.uid) return;
+  db.collection("rooms").doc(state.roomId).collection("players").doc(state.uid)
+    .update({ lastActiveMs: Date.now() })
+    .catch(() => { /* 一時的な通信エラーは無視してよい */ });
+}
+
+function startPresenceHeartbeat() {
+  stopPresenceHeartbeat();
+  pingPresence();
+  presenceTimer = setInterval(pingPresence, PRESENCE_INTERVAL_MS);
+}
+
+function stopPresenceHeartbeat() {
+  if (presenceTimer) {
+    clearInterval(presenceTimer);
+    presenceTimer = null;
+  }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") pingPresence();
+});
 
 /* ---------- 部屋の期限が近いことを知らせる ---------- */
 function startExpiryWatch(room) {
@@ -264,12 +374,18 @@ $("btn-create-room").addEventListener("click", async () => {
       round: 1,
       playerCount: 0,
       currentCommand: null,
+      weakVotes: {},
+      votingOpen: false,
+      voteOptions: [],
+      votes: {},
+      voteResolvedIndex: null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
     await db.collection("rooms").doc(roomId).collection("players").doc(state.uid).set({
       name,
       number: null,
+      lastActiveMs: Date.now(),
       joinedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -326,6 +442,7 @@ $("btn-join-room").addEventListener("click", async () => {
     await roomRef.collection("players").doc(state.uid).set({
       name,
       number: null,
+      lastActiveMs: Date.now(),
       joinedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -363,6 +480,7 @@ function enterLobby() {
   listenToRoom();
   listenToPlayers();
   listenToHistory();
+  startPresenceHeartbeat();
 }
 
 // 招待リンクのQRコードを描画(スマホのカメラで読み取って参加できるようにする)
@@ -402,7 +520,11 @@ function listenToPlayers() {
 
       $("lobby-count").textContent = `(${players.length}/${MAX_PLAYERS})`;
       $("lobby-player-list").innerHTML = players
-        .map((p) => `<li>${escapeHtml(p.name)}</li>`)
+        .map((p) => {
+          const isOnline = typeof p.lastActiveMs === "number"
+            && (Date.now() - p.lastActiveMs) < PRESENCE_ONLINE_THRESHOLD_MS;
+          return `<li><span class="presence-dot${isOnline ? " is-online" : ""}"></span>${escapeHtml(p.name)}</li>`;
+        })
         .join("");
 
       if (state.isHost) {
@@ -497,6 +619,9 @@ function resetToHome() {
   sessionStorage.removeItem("kg_myName");
   state.roomId = null;
   state.isHost = false;
+  state.enteredDrawRound = null;
+  state.appliedResolvedVoteIndex = null;
+  state.lastAnnouncedKey = null;
   hideRoundIndicator();
   showScreen("screen-home");
 }
@@ -535,7 +660,11 @@ function listenToRoom() {
           enterLobby();
         }
       } else if (room.status === "drawn") {
-        enterDrawScreen(room);
+        if (state.enteredDrawRound !== room.round) {
+          state.enteredDrawRound = room.round;
+          enterDrawScreen(room);
+        }
+        syncDrawExtras(room);
       } else if (room.status === "command") {
         enterCommandScreen(room);
       }
@@ -590,6 +719,16 @@ function enterDrawScreen(room) {
   $("king-command-panel").hidden = true;
   $("draw-wait-note").hidden = false;
   $("draw-wait-note").textContent = "くじをシャッフルしています…";
+  $("draw-thinking-note").hidden = true;
+  $("vote-panel").hidden = true;
+
+  currentTemplateIndex = null;
+  state.appliedResolvedVoteIndex = null;
+  setKingMode("manual");
+  $("template-select").value = "";
+  $("target-select-block").hidden = true;
+  $("btn-reroll").hidden = true;
+  $("command-text").value = "";
 
   let minTimePassed = false;
   let numberData = null;
@@ -611,7 +750,11 @@ function enterDrawScreen(room) {
     const amKing = room.kingUid === state.uid;
     $("draw-king-badge").hidden = !amKing;
 
-    if (amKing) setupKingPanel();
+    if (amKing) {
+      setupKingPanel();
+    } else {
+      $("draw-thinking-note").hidden = false;
+    }
   }
 
   if (state.unsubMe) state.unsubMe();
@@ -632,6 +775,181 @@ function enterDrawScreen(room) {
 }
 
 let currentTemplateIndex = null;
+
+/* ---------- 命令の決め方: 自分で選ぶ / みんなで投票する ---------- */
+function setKingMode(mode) {
+  $("btn-mode-manual").classList.toggle("is-active", mode === "manual");
+  $("btn-mode-vote").classList.toggle("is-active", mode === "vote");
+  $("manual-template-block").hidden = mode === "vote";
+}
+
+$("btn-mode-manual").addEventListener("click", async () => {
+  setKingMode("manual");
+  state.appliedResolvedVoteIndex = null;
+  // 投票を進行中にやめる場合は、投票データをクリアする
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      votingOpen: false,
+      voteOptions: [],
+      votes: {},
+      voteResolvedIndex: null
+    });
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+$("btn-mode-vote").addEventListener("click", () => {
+  setKingMode("vote");
+  state.appliedResolvedVoteIndex = null;
+  startVoting();
+});
+
+async function startVoting() {
+  if (!state.roomId) return;
+  const count = Math.min(3, COMMAND_TEMPLATES_FLAT.length);
+  const indices = shuffle(COMMAND_TEMPLATES_FLAT.map((_, i) => i)).slice(0, count);
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      votingOpen: true,
+      voteOptions: indices,
+      votes: {},
+      voteResolvedIndex: null
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+}
+
+$("btn-cancel-vote").addEventListener("click", async () => {
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      votingOpen: false,
+      voteOptions: [],
+      votes: {},
+      voteResolvedIndex: null
+    });
+    state.appliedResolvedVoteIndex = null;
+    setKingMode("manual");
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+});
+
+$("btn-close-vote").addEventListener("click", async () => {
+  $("btn-close-vote").disabled = true;
+  try {
+    const roomRef = db.collection("rooms").doc(state.roomId);
+    const snap = await roomRef.get();
+    const room = snap.data();
+    const voteOptions = room.voteOptions || [];
+    const votes = room.votes || {};
+    if (!voteOptions.length) return;
+
+    const counts = voteOptions.map((_, idx) =>
+      Object.values(votes).filter((v) => v === idx).length
+    );
+    const maxCount = Math.max(...counts);
+    const winners = counts
+      .map((c, idx) => (c === maxCount ? idx : -1))
+      .filter((idx) => idx !== -1);
+    const winnerLocalIdx = winners[Math.floor(Math.random() * winners.length)];
+    const winnerTemplateIdx = voteOptions[winnerLocalIdx];
+
+    await roomRef.update({
+      votingOpen: false,
+      voteResolvedIndex: winnerTemplateIdx
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  } finally {
+    $("btn-close-vote").disabled = false;
+  }
+});
+
+// 投票結果に応じて対象者選択の画面を作る(手動選択時と同じ流れに合流させる)
+function applyResolvedTemplateForKing(tplIdx) {
+  $("king-command-panel").hidden = false;
+  $("manual-template-block").hidden = true;
+  const select = $("template-select");
+  if (select.dataset.filled === "1") select.value = String(tplIdx);
+  currentTemplateIndex = tplIdx;
+  const tpl = COMMAND_TEMPLATES_FLAT[tplIdx];
+  const nums = pickUniqueNumbers(tpl.slots, state.playerCount || 3, state.myNumber);
+
+  populateTargetSelects(tpl);
+  $("target-a-select").value = nums[0];
+  if (tpl.slots === 2) {
+    populateTargetSelects(tpl, { keepA: true });
+    $("target-b-select").value = nums[1];
+  }
+  $("target-select-block").hidden = false;
+  $("btn-reroll").hidden = false;
+  renderCommandFromTargets();
+  showErrorBanner("投票で命令テーマが決まりました。対象者を確認して発表してください。", true);
+}
+
+// 部屋ドキュメントの更新のたびに(くじの再演出はせず)投票パネルなどを同期する
+function syncDrawExtras(room) {
+  const amKing = room.kingUid === state.uid;
+  const votingOpen = !!room.votingOpen;
+  const voteOptions = room.voteOptions || [];
+  const votes = room.votes || {};
+
+  if (votingOpen && voteOptions.length) {
+    renderVotePanel(amKing, voteOptions, votes);
+    $("vote-panel").hidden = false;
+    if (amKing) $("king-command-panel").hidden = true;
+  } else {
+    $("vote-panel").hidden = true;
+    if (amKing && room.voteResolvedIndex != null
+        && state.appliedResolvedVoteIndex !== room.voteResolvedIndex) {
+      state.appliedResolvedVoteIndex = room.voteResolvedIndex;
+      applyResolvedTemplateForKing(room.voteResolvedIndex);
+    }
+  }
+}
+
+function renderVotePanel(amKing, voteOptions, votes) {
+  const list = $("vote-options-list");
+  const counts = voteOptions.map((_, idx) =>
+    Object.values(votes).filter((v) => v === idx).length
+  );
+  const myVote = votes[state.uid];
+
+  list.innerHTML = voteOptions
+    .map((tplIdx, idx) => {
+      const tpl = COMMAND_TEMPLATES_FLAT[tplIdx];
+      const label = tpl ? tpl.text.replace("{A}", "◯").replace("{B}", "△") : "";
+      const mineClass = myVote === idx ? " is-mine" : "";
+      return `<li><button type="button" class="vote-option-btn${mineClass}" data-idx="${idx}">
+        <span>${escapeHtml(label)}</span><span class="vote-option-count">${counts[idx]}票</span>
+      </button></li>`;
+    })
+    .join("");
+
+  list.querySelectorAll(".vote-option-btn").forEach((btn) => {
+    btn.onclick = () => castVote(Number(btn.dataset.idx));
+  });
+
+  $("vote-king-controls").hidden = !amKing;
+  $("vote-guest-note").hidden = amKing;
+}
+
+async function castVote(idx) {
+  if (!state.roomId || !state.uid) return;
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      [`votes.${state.uid}`]: idx
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+}
 
 function setupKingPanel() {
   $("king-command-panel").hidden = false;
@@ -748,7 +1066,12 @@ $("btn-send-command").addEventListener("click", async () => {
     const roomRef = db.collection("rooms").doc(state.roomId);
     await roomRef.update({
       status: "command",
-      currentCommand: text
+      currentCommand: text,
+      weakVotes: {},
+      votingOpen: false,
+      voteOptions: [],
+      votes: {},
+      voteResolvedIndex: null
     });
     await roomRef.collection("history").add({
       round: state.currentRound,
@@ -764,6 +1087,24 @@ $("btn-send-command").addEventListener("click", async () => {
   }
 });
 
+/* ---------- 音声読み上げ ---------- */
+function speakCommand(text) {
+  if (!text || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "ja-JP";
+    utter.rate = 1.0;
+    window.speechSynthesis.speak(utter);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+$("btn-speak-command").addEventListener("click", () => {
+  speakCommand($("command-display").textContent);
+});
+
 /* ==========================================================
    画面4: 命令発表
    ========================================================== */
@@ -773,7 +1114,35 @@ function enterCommandScreen(room) {
   $("command-my-number").textContent = state.myNumber != null ? state.myNumber : "?";
   $("command-host-controls").hidden = !state.isHost;
   $("command-guest-note").hidden = state.isHost;
+
+  const weakVotes = room.weakVotes || {};
+  const weakCount = Object.keys(weakVotes).length;
+  $("weak-vote-count").textContent = weakCount > 0 ? `😅「弱いかも」: ${weakCount}人` : "";
+  $("btn-weak-vote").hidden = state.isKing;
+  $("btn-weak-vote").disabled = !!weakVotes[state.uid];
+
+  // 同じ命令に対して効果音・読み上げを何度も再生しないように、ラウンド+命令文をキーにする
+  const announceKey = `${room.round}|${room.currentCommand || ""}`;
+  if (state.lastAnnouncedKey !== announceKey) {
+    state.lastAnnouncedKey = announceKey;
+    playCommandRevealEffect();
+    if (soundEnabled) speakCommand(room.currentCommand || "");
+  }
 }
+
+$("btn-weak-vote").addEventListener("click", async () => {
+  if (!state.roomId || !state.uid) return;
+  $("btn-weak-vote").disabled = true;
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      [`weakVotes.${state.uid}`]: true
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+    $("btn-weak-vote").disabled = false;
+  }
+});
 
 $("btn-next-round").addEventListener("click", async () => {
   $("btn-next-round").disabled = true;
@@ -786,7 +1155,12 @@ $("btn-next-round").addEventListener("click", async () => {
       status: "waiting",
       kingUid: null,
       currentCommand: null,
-      round: firebase.firestore.FieldValue.increment(1)
+      round: firebase.firestore.FieldValue.increment(1),
+      weakVotes: {},
+      votingOpen: false,
+      voteOptions: [],
+      votes: {},
+      voteResolvedIndex: null
     });
     await batch.commit();
   } catch (err) {
@@ -804,6 +1178,7 @@ function cleanupListeners() {
   if (state.unsubMe) state.unsubMe();
   if (state.unsubHistory) state.unsubHistory();
   stopExpiryWatch();
+  stopPresenceHeartbeat();
 }
 
 /* ==========================================================

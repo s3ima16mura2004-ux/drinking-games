@@ -132,6 +132,38 @@ body {
   background: rgba(212, 166, 74, 0.08);
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.icon-btn {
+  min-height: 36px;
+  min-width: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+  color: var(--text-main);
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.theme-select {
+  min-height: 36px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: var(--panel);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .app-shell {
   position: relative;
   z-index: 1;
@@ -439,7 +471,21 @@ body {
   min-height: 40px;
   display: flex;
   align-items: center;
+  gap: 8px;
   font-size: 14px;
+}
+
+.presence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.presence-dot.is-online {
+  background: #7bc67e;
+  box-shadow: 0 0 6px rgba(123, 198, 126, 0.7);
 }
 
 .host-controls { margin-top: 6px; }
@@ -531,6 +577,72 @@ body {
 /* ---------- 王様命令パネル ---------- */
 #king-command-panel { border-color: var(--gold); }
 
+.mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-toggle-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-line);
+  background: var(--bg-night-deep);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-toggle-btn.is-active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.vote-options-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vote-option-btn {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-line);
+  background: var(--bg-night-deep);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.vote-option-btn.is-mine {
+  border-color: var(--gold);
+}
+
+.vote-option-count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.weak-vote-block {
+  margin-top: 8px;
+}
+
 .target-select-block {
   display: flex;
   gap: 12px;
@@ -566,6 +678,87 @@ body {
   color: var(--text-muted);
   min-height: 16px;
   margin-top: 10px;
+}
+
+/* ---------- 季節テーマ(CSS変数の上書き) ---------- */
+:root[data-theme="spring"] {
+  --bg-night: #241a2e;
+  --bg-night-deep: #170f20;
+  --panel: #33253f;
+  --panel-line: #4a3757;
+  --lantern-red: #f193b0;
+  --lantern-red-soft: rgba(241, 147, 176, 0.35);
+  --gold: #e8b7cf;
+  --gold-soft: rgba(232, 183, 207, 0.25);
+}
+
+:root[data-theme="summer"] {
+  --bg-night: #0c1a33;
+  --bg-night-deep: #071022;
+  --panel: #142347;
+  --panel-line: #24386b;
+  --lantern-red: #ff7a45;
+  --lantern-red-soft: rgba(255, 122, 69, 0.35);
+  --gold: #ffd35c;
+  --gold-soft: rgba(255, 211, 92, 0.25);
+}
+
+:root[data-theme="autumn"] {
+  --bg-night: #241510;
+  --bg-night-deep: #170d0a;
+  --panel: #34211a;
+  --panel-line: #4c3327;
+  --lantern-red: #d9662f;
+  --lantern-red-soft: rgba(217, 102, 47, 0.35);
+  --gold: #e0a53f;
+  --gold-soft: rgba(224, 165, 63, 0.25);
+}
+
+:root[data-theme="winter"] {
+  --bg-night: #0c1420;
+  --bg-night-deep: #070c14;
+  --panel: #15233a;
+  --panel-line: #253a58;
+  --lantern-red: #6fa8dc;
+  --lantern-red-soft: rgba(111, 168, 220, 0.35);
+  --gold: #cfe8f5;
+  --gold-soft: rgba(207, 232, 245, 0.2);
+}
+
+/* ---------- 季節の演出(花びら・雪・落ち葉・火の粉) ---------- */
+.season-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.fx-particle {
+  position: absolute;
+  top: -10%;
+  display: none;
+  border-radius: 50%;
+  animation: fx-fall linear infinite;
+}
+
+:root[data-theme="spring"] .fx-sakura { display: block; background: #f4b6cf; width: 10px; height: 10px; border-radius: 60% 0 60% 0; }
+:root[data-theme="winter"] .fx-snow { display: block; background: #eaf4fb; width: 6px; height: 6px; }
+:root[data-theme="autumn"] .fx-leaf { display: block; background: #d9862f; width: 9px; height: 9px; border-radius: 0 60% 0 60%; }
+:root[data-theme="summer"] .fx-ember { display: block; background: #ffcf6b; width: 4px; height: 4px; box-shadow: 0 0 6px 1px rgba(255,207,107,0.7); }
+
+.fx-particle.p1 { left: 12%; animation-duration: 9s; animation-delay: 0s; }
+.fx-particle.p2 { left: 38%; animation-duration: 12s; animation-delay: 2s; }
+.fx-particle.p3 { left: 64%; animation-duration: 10s; animation-delay: 4s; }
+.fx-particle.p4 { left: 86%; animation-duration: 13s; animation-delay: 1s; }
+
+@keyframes fx-fall {
+  0% { transform: translateY(-10vh) translateX(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.85; }
+  100% { transform: translateY(110vh) translateX(24px) rotate(200deg); opacity: 0.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-particle { animation: none; display: none !important; }
 }
 
 /* ---------- レスポンシブ ---------- */
