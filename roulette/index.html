@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0b132b">
-    <!-- ホーム画面に追加した時、ブラウザのアドレスバー無しでアプリっぽく開けるように -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +12,6 @@
 </head>
 <body>
 
-    <!-- iPhoneは振動非対応なので、当たった瞬間の画面フラッシュで体感を補完 -->
     <div class="hit-flash" id="hitFlash"></div>
 
     <div class="app-content">
@@ -44,13 +42,33 @@
                 </div>
 
                 <div class="option-group">
-                    <h3>弾の数を選ぼう</h3>
+                    <h3>ゲームモード</h3>
                     <div class="chamber-select">
-                        <button class="chamber-btn" data-count="3" onclick="selectChamberCount(3)">3発<br><span>ハイリスク</span></button>
-                        <button class="chamber-btn active" data-count="6" onclick="selectChamberCount(6)">6発<br><span>標準</span></button>
-                        <button class="chamber-btn" data-count="8" onclick="selectChamberCount(8)">8発<br><span>のんびり</span></button>
+                        <button class="chamber-btn" data-gamemode="classic" onclick="selectGameMode('classic')">🎯<br><span>クラシック</span></button>
+                        <button class="chamber-btn active" data-gamemode="lap" onclick="selectGameMode('lap')">🔁<br><span>周回制</span></button>
+                    </div>
+                    <p class="option-hint" id="gameModeHint">周回制：全員が一周し終わるまで続行。複数人が当たることもあります</p>
+                </div>
+
+                <div class="option-group">
+                    <h3>周回数 <span style="color:#aaa; font-weight:normal; font-size:12px;">(人数に応じて弾倉の数が決まるよ)</span></h3>
+                    <div class="chamber-select">
+                        <button class="chamber-btn active" data-rounds="1" onclick="selectRounds(1)">×1周</button>
+                        <button class="chamber-btn" data-rounds="1.5" onclick="selectRounds(1.5)">×1.5周</button>
+                        <button class="chamber-btn" data-rounds="2" onclick="selectRounds(2)">×2周</button>
                     </div>
                 </div>
+
+                <div class="option-group" id="riskGroup">
+                    <h3>危険度</h3>
+                    <div class="chamber-select">
+                        <button class="chamber-btn" data-risk="low" onclick="selectRisk('low')">😌<br><span>低い(約10%)</span></button>
+                        <button class="chamber-btn active" data-risk="standard" onclick="selectRisk('standard')">😳<br><span>標準(約20%)</span></button>
+                        <button class="chamber-btn" data-risk="high" onclick="selectRisk('high')">😱<br><span>高い(約35%)</span></button>
+                    </div>
+                </div>
+
+                <p class="settings-summary" id="settingsSummary"></p>
 
                 <div class="option-group">
                     <h3>罰ゲームのジャンルを選ぼう <span style="color:#aaa; font-weight:normal; font-size:12px;">(複数選択可)</span></h3>
@@ -87,7 +105,6 @@
 
                 <div id="comboBanner" class="combo-banner"></div>
 
-                <!-- 弾倉が実際に回転するSVGビジュアル -->
                 <div class="cylinder-wrap">
                     <div id="cylinderSvgContainer"></div>
                     <div class="status" id="status">🥃</div>
@@ -95,7 +112,6 @@
 
                 <div id="message">順番に引き金を引いてね...</div>
 
-                <!-- 「次の人が決める」モード用の罰ゲーム選択UI -->
                 <div id="penaltyPicker" class="penalty-picker" style="display:none;"></div>
 
                 <div id="resultSummary" class="result-summary" style="display:none;"></div>
@@ -105,7 +121,6 @@
 
     </div>
 
-    <!-- 主要アクションボタンは常に画面下部に固定。スマホを回して渡しても迷わず親指で押せる -->
     <div class="bottom-bar">
         <button class="action-btn" id="startBtn" onclick="startGame()">ゲーム開始</button>
         <button class="action-btn pulse-btn" id="shootBtn" onclick="pullTrigger()" style="display:none;">引き金を引く！</button>
