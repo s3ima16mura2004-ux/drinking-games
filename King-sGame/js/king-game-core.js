@@ -45,11 +45,19 @@ const state = {
   recentTemplateIndices: [],
   historyItems: [],
   customTemplates: [],
+  players: [],
+  lastToastAt: null,
+  momentsItems: [],
+  pendingMomentPhoto: null,
+  summaryReportText: "",
+  bannedKeywords: [],
+  localRulesNote: "",
   unsubRoom: null,
   unsubPlayers: null,
   unsubMe: null,
   unsubHistory: null,
-  unsubCustomTemplates: null
+  unsubCustomTemplates: null,
+  unsubMoments: null
 };
 
 /* ---------- DOM ヘルパー ---------- */
@@ -285,15 +293,17 @@ async function generateUniqueRoomCode() {
 async function cleanupExpiredRoom(roomId) {
   try {
     const roomRef = db.collection("rooms").doc(roomId);
-    const [playersSnap, historySnap, customTemplatesSnap] = await Promise.all([
+    const [playersSnap, historySnap, customTemplatesSnap, momentsSnap] = await Promise.all([
       roomRef.collection("players").get(),
       roomRef.collection("history").get(),
-      roomRef.collection("customTemplates").get()
+      roomRef.collection("customTemplates").get(),
+      roomRef.collection("moments").get()
     ]);
     const batch = db.batch();
     playersSnap.forEach((doc) => batch.delete(doc.ref));
     historySnap.forEach((doc) => batch.delete(doc.ref));
     customTemplatesSnap.forEach((doc) => batch.delete(doc.ref));
+    momentsSnap.forEach((doc) => batch.delete(doc.ref));
     batch.delete(roomRef);
     await batch.commit();
   } catch (err) {

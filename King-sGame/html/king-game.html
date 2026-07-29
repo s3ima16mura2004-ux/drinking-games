@@ -127,6 +127,35 @@
         <summary>これまでの命令</summary>
         <ul id="lobby-history-list" class="history-list"></ul>
       </details>
+
+      <details id="local-rules-panel" class="history-panel" open>
+        <summary>📋 今夜のローカルルール</summary>
+        <div id="local-rules-host-controls" class="local-rules-body" hidden>
+          <label class="field-label" for="local-rules-note-input">今夜のメモ(全員に表示されます)</label>
+          <textarea id="local-rules-note-input" class="text-input textarea-input" rows="2" maxlength="200" placeholder="例: 一発ギャグはNG、飲めない人もいるのでお酒強要なし"></textarea>
+          <button id="btn-save-local-rules-note" class="btn btn-ghost btn-small" type="button">メモを保存</button>
+
+          <label class="field-label">NGワード(このワードを含むお題は選ばれなくなります)</label>
+          <div id="ng-word-chips" class="category-chips"></div>
+          <input id="ng-word-input" class="text-input" type="text" placeholder="例: イッキ" maxlength="20">
+          <button id="btn-add-ng-word" class="btn btn-ghost btn-small" type="button">追加</button>
+        </div>
+        <div id="local-rules-guest-view" class="local-rules-body">
+          <p id="local-rules-note-display" class="hint-text"></p>
+          <div id="ng-word-chips-readonly" class="category-chips"></div>
+        </div>
+      </details>
+
+      <details id="toast-roulette-panel" class="history-panel">
+        <summary>🍻 乾杯・役割ルーレットを回す</summary>
+        <div class="toast-roulette-body">
+          <p class="hint-text">音頭取りや買い出し係などをランダムで決められます(ソフトドリンクの人もぜひ)</p>
+          <div id="toast-role-chips" class="category-chips"></div>
+          <input id="toast-custom-role" class="text-input" type="text" placeholder="役割を自由入力してもOK(例: 二次会の店決め係)" maxlength="20">
+          <p id="toast-roulette-display" class="roulette-display" hidden></p>
+          <button id="btn-spin-toast" class="btn btn-secondary btn-small" type="button">🎲 回す!</button>
+        </div>
+      </details>
     </div>
   </section>
 
@@ -251,6 +280,20 @@
       </div>
       <div id="command-guest-note" class="hint-text" hidden>幹事が次のラウンドを始めるのを待っています…</div>
 
+      <div class="moment-post-block">
+        <p class="field-label">📷 証拠写真・ひとことコメント</p>
+        <div id="moment-photo-preview" class="moment-photo-preview" hidden>
+          <img id="moment-photo-preview-img" alt="添付した写真のプレビュー">
+          <button id="btn-remove-moment-photo" class="btn btn-ghost btn-small" type="button">✕ 写真を外す</button>
+        </div>
+        <input id="moment-photo-input" type="file" accept="image/*" capture="environment" hidden>
+        <button id="btn-take-moment-photo" class="btn btn-ghost btn-small" type="button">📷 写真を撮る</button>
+        <input id="moment-comment-input" class="text-input" type="text" placeholder="ひとことコメント(例: 大爆笑でした)" maxlength="60">
+        <button id="btn-post-moment" class="btn btn-secondary btn-small" type="button">この瞬間を記録する</button>
+      </div>
+
+      <ul id="moments-feed" class="moments-feed"></ul>
+
       <details id="command-history-panel" class="history-panel" hidden>
         <summary>これまでの命令</summary>
         <ul id="command-history-list" class="history-list"></ul>
@@ -270,6 +313,21 @@
 
       <p id="summary-weak-highlight" class="summary-weak-highlight" hidden></p>
 
+      <div id="summary-gallery" class="summary-gallery" hidden>
+        <h3 class="summary-subtitle">📸 今日のベストショット</h3>
+        <div class="summary-gallery-viewport">
+          <img id="summary-gallery-img" class="summary-gallery-img" alt="記録された瞬間の写真" hidden>
+          <p id="summary-gallery-comment" class="summary-gallery-comment"></p>
+          <p id="summary-gallery-meta" class="hint-text"></p>
+        </div>
+        <div class="summary-gallery-nav">
+          <button id="btn-gallery-prev" class="btn btn-ghost btn-small" type="button">← 前へ</button>
+          <span id="summary-gallery-position" class="hint-text"></span>
+          <button id="btn-gallery-next" class="btn btn-ghost btn-small" type="button">次へ →</button>
+        </div>
+      </div>
+
+      <button id="btn-copy-report" class="btn btn-ghost btn-small" type="button">📋 レポートをコピーする</button>
       <button id="btn-confirm-close-room" class="btn btn-primary">解散して終了する</button>
       <button id="btn-cancel-close-room" class="btn btn-ghost btn-small">キャンセルして戻る</button>
     </div>

@@ -737,6 +737,57 @@ body {
   color: var(--gold);
 }
 
+.local-rules-body {
+  margin-top: 4px;
+}
+
+.local-rules-body .text-input {
+  margin: 8px 0;
+}
+
+.ng-word-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: rgba(198, 86, 86, 0.1);
+  font-size: 13px;
+}
+
+.ng-word-chip button {
+  border: none;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+
+.ng-word-chip-readonly {
+  display: inline-flex;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.toast-roulette-body {
+  margin-top: 4px;
+}
+
+.toast-roulette-body .text-input {
+  margin: 10px 0;
+}
+
+.toast-roulette-body .roulette-display {
+  margin: 10px 0;
+}
+
 .vote-options-list {
   list-style: none;
   margin: 0 0 14px;
@@ -997,6 +1048,121 @@ body {
   padding: 12px;
   margin: 0 0 6px;
   text-align: left;
+}
+
+/* ---------- 証拠写真・ひとことコメント ---------- */
+.moment-post-block {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--panel-line);
+  text-align: left;
+}
+
+.moment-photo-preview {
+  margin: 10px 0;
+  text-align: center;
+}
+
+.moment-photo-preview img {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: var(--radius-md);
+  display: block;
+  margin: 0 auto 8px;
+}
+
+#moment-comment-input {
+  margin: 10px 0;
+}
+
+.moments-feed {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.moment-card {
+  background: var(--bg-night-deep);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.moment-card img {
+  width: 100%;
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.moment-card-comment {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.moment-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.moment-card-author {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.moment-clap-btn {
+  border: 1px solid var(--panel-line);
+  background: transparent;
+  color: var(--text-main);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.moment-clap-btn.is-mine {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+
+/* ---------- 解散前サマリー: ベストショットギャラリー ---------- */
+.summary-gallery {
+  margin: 18px 0;
+}
+
+.summary-gallery-viewport {
+  background: var(--bg-night-deep);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  text-align: center;
+}
+
+.summary-gallery-img {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+}
+
+.summary-gallery-comment {
+  font-size: 14px;
+  color: var(--paper);
+  margin: 0 0 4px;
+}
+
+.summary-gallery-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
 }
 
 /* ---------- レスポンシブ ---------- */

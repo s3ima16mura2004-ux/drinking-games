@@ -128,8 +128,12 @@ $("btn-mode-vote").addEventListener("click", () => {
 
 async function startVoting() {
   if (!state.roomId) return;
-  const count = Math.min(3, COMMAND_TEMPLATES_FLAT.length);
-  const indices = shuffle(COMMAND_TEMPLATES_FLAT.map((_, i) => i)).slice(0, count);
+  const allowedIndices = COMMAND_TEMPLATES_FLAT
+    .map((_, i) => i)
+    .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text));
+  const pool = allowedIndices.length ? allowedIndices : COMMAND_TEMPLATES_FLAT.map((_, i) => i);
+  const count = Math.min(3, pool.length);
+  const indices = shuffle(pool).slice(0, count);
   try {
     await db.collection("rooms").doc(state.roomId).update({
       votingOpen: true,
@@ -359,9 +363,23 @@ function selectCategory(catIndex) {
   renderTemplateItemList(catIndex);
 }
 
+// NGワードに一致するお題を除外する(今夜のローカルルールで設定されたもの)
+function isTextNgFiltered(text) {
+  const keywords = state.bannedKeywords || [];
+  if (!keywords.length) return false;
+  const lower = text.toLowerCase();
+  return keywords.some((w) => w && lower.includes(w.toLowerCase()));
+}
+
 function renderTemplateItemList(catIndex) {
   const cat = COMMAND_CATEGORIES[catIndex];
-  const indices = cat.items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item));
+  const indices = cat.items
+    .map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item))
+    .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text));
+  if (!indices.length) {
+    $("template-item-list").innerHTML = '<li class="template-empty-hint">このカテゴリのお題はNGワードに一致しているため表示できません</li>';
+    return;
+  }
   $("template-item-list").innerHTML = buildTemplateItemsHtml(indices);
   wireTemplateItemButtons();
 }
@@ -371,6 +389,7 @@ function renderTemplateSearchResults(query) {
   const q = query.toLowerCase();
   const indices = COMMAND_TEMPLATES_FLAT
     .map((_, idx) => idx)
+    .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text))
     .filter((idx) => COMMAND_TEMPLATES_FLAT[idx].text.replace("{A}", "◯").replace("{B}", "△").toLowerCase().includes(q));
 
   const list = $("template-item-list");
@@ -408,7 +427,7 @@ function wireTemplateItemButtons() {
 // この部屋だけのオリジナルお題(自由入力から保存されたもの)の一覧
 function renderCustomTemplateItemList() {
   const list = $("template-item-list");
-  const items = state.customTemplates || [];
+  const items = (state.customTemplates || []).filter((item) => !isTextNgFiltered(item.text));
   if (!items.length) {
     list.innerHTML = '<li class="template-empty-hint">まだこの部屋のオリジナルお題はありません</li>';
     return;
@@ -551,14 +570,22 @@ function excludingRecentlyUsed(pool) {
   return filtered.length ? filtered : pool;
 }
 
+// NGワードに一致するお題をプールから除外する(全滅する場合は元のプールにフォールバック)
+function excludingNgWords(pool) {
+  const filtered = pool.filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text));
+  return filtered.length ? filtered : pool;
+}
+
 $("btn-roulette-all").addEventListener("click", () => {
-  const all = COMMAND_TEMPLATES_FLAT.map((_, i) => i);
+  const all = excludingNgWords(COMMAND_TEMPLATES_FLAT.map((_, i) => i));
   runRoulette(all, excludingRecentlyUsed(all));
 });
 
 $("btn-roulette-category").addEventListener("click", () => {
   if (selectedCategoryIndex == null) return;
-  const pool = COMMAND_CATEGORIES[selectedCategoryIndex].items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item));
+  const pool = excludingNgWords(
+    COMMAND_CATEGORIES[selectedCategoryIndex].items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item))
+  );
   runRoulette(pool, excludingRecentlyUsed(pool));
 });
 

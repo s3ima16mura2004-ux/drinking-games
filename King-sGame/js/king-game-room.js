@@ -21,8 +21,18 @@ function listenToRoom() {
       state.isKing = room.kingUid === state.uid;
       state.playerCount = room.playerCount || state.playerCount;
       state.currentRound = room.round || 1;
+      state.bannedKeywords = room.bannedKeywords || [];
+      state.localRulesNote = room.localRulesNote || "";
+      renderLocalRules();
       updateRoundIndicator();
       startExpiryWatch(room);
+
+      // 🍻 乾杯・役割ルーレットの結果が出た瞬間、全員にトースト通知する
+      const toast = room.toastRoulette;
+      if (toast && toast.at && state.lastToastAt !== toast.at) {
+        state.lastToastAt = toast.at;
+        showErrorBanner(`🍻 ${toast.winnerName}さんが「${toast.role}」に選ばれました!`, true);
+      }
 
       // ラウンドの切り替わりを検知して、全員に一瞬の通知を出す
       if (state.lastRoomStatus === "command" && room.status === "waiting") {

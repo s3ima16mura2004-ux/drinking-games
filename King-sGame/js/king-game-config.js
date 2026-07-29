@@ -44,6 +44,13 @@
               allow create: if request.auth != null;
               allow delete: if request.auth != null;
             }
+
+            match /moments/{momentId} {
+              allow read: if request.auth != null;
+              allow create: if request.auth != null;
+              allow update: if request.auth != null;
+              allow delete: if request.auth != null;
+            }
           }
         }
       }

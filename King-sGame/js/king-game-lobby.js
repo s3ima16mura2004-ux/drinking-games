@@ -71,6 +71,8 @@ $("btn-create-room").addEventListener("click", async () => {
       voteOptions: [],
       votes: {},
       voteResolvedIndex: null,
+      localRulesNote: "",
+      bannedKeywords: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -167,6 +169,8 @@ function enterLobby() {
   $("lobby-room-code").textContent = state.roomId;
   $("lobby-host-controls").hidden = !state.isHost;
   $("lobby-guest-note").hidden = state.isHost;
+  $("local-rules-host-controls").hidden = !state.isHost;
+  $("local-rules-guest-view").hidden = state.isHost;
   renderLobbyQrCode();
 
   if (localStorage.getItem("kg_seenLobbyOnboarding") !== "1") {
@@ -177,6 +181,7 @@ function enterLobby() {
   listenToPlayers();
   listenToHistory();
   listenToCustomTemplates();
+  listenToMoments();
   startPresenceHeartbeat();
 }
 
@@ -184,6 +189,73 @@ $("btn-close-onboarding").addEventListener("click", () => {
   $("lobby-onboarding").hidden = true;
   localStorage.setItem("kg_seenLobbyOnboarding", "1");
 });
+
+/* ---------- 📋 今夜のローカルルール・NGワード ---------- */
+function renderLocalRules() {
+  const noteInput = $("local-rules-note-input");
+  const noteDisplay = $("local-rules-note-display");
+  const keywords = state.bannedKeywords || [];
+
+  // 入力中に上書きしてしまわないよう、フォーカス中は書き換えない
+  if (document.activeElement !== noteInput) {
+    noteInput.value = state.localRulesNote || "";
+  }
+  noteDisplay.textContent = state.localRulesNote
+    ? state.localRulesNote
+    : "今のところ特別なローカルルールはありません";
+
+  const chipsWrap = $("ng-word-chips");
+  chipsWrap.innerHTML = keywords.length
+    ? keywords
+        .map((w) => `<span class="ng-word-chip">${escapeHtml(w)}<button type="button" data-word="${escapeHtml(w)}" aria-label="削除">×</button></span>`)
+        .join("")
+    : '<span class="hint-text">まだNGワードはありません</span>';
+  chipsWrap.querySelectorAll("button[data-word]").forEach((btn) => {
+    btn.addEventListener("click", () => removeNgWord(btn.dataset.word));
+  });
+
+  const readonlyWrap = $("ng-word-chips-readonly");
+  readonlyWrap.innerHTML = keywords.length
+    ? keywords.map((w) => `<span class="ng-word-chip-readonly">🚫 ${escapeHtml(w)}</span>`).join("")
+    : '<span class="hint-text">まだNGワードはありません</span>';
+}
+
+$("btn-save-local-rules-note").addEventListener("click", async () => {
+  const note = $("local-rules-note-input").value.trim();
+  try {
+    await db.collection("rooms").doc(state.roomId).update({ localRulesNote: note });
+    showErrorBanner("ローカルルールを保存しました", true);
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+});
+
+$("btn-add-ng-word").addEventListener("click", async () => {
+  const input = $("ng-word-input");
+  const word = input.value.trim();
+  if (!word) return;
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      bannedKeywords: firebase.firestore.FieldValue.arrayUnion(word)
+    });
+    input.value = "";
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+});
+
+async function removeNgWord(word) {
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      bannedKeywords: firebase.firestore.FieldValue.arrayRemove(word)
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+}
 
 // 招待リンクのQRコードを描画(スマホのカメラで読み取って参加できるようにする)
 function renderLobbyQrCode() {
@@ -219,6 +291,7 @@ function listenToPlayers() {
       const players = [];
       snap.forEach((doc) => players.push({ id: doc.id, ...doc.data() }));
       state.playerCount = players.length;
+      state.players = players;
 
       $("lobby-count").textContent = `(${players.length}/${MAX_PLAYERS})`;
       $("lobby-player-list").innerHTML = players
@@ -294,18 +367,102 @@ $("btn-copy-link").addEventListener("click", async () => {
   }
 });
 
+/* ---------- 🍻 乾杯・役割ルーレット(王様の命令とは別枠のミニ抽選) ---------- */
+const TOAST_ROLE_PRESETS = ["乾杯の音頭取り", "次の買い出し係", "ドリンクを奢る人", "お会計係"];
+let selectedToastRole = TOAST_ROLE_PRESETS[0];
+let toastRouletteTimer = null;
+
+function renderToastRoleChips() {
+  const wrap = $("toast-role-chips");
+  if (wrap.dataset.filled === "1") return;
+  wrap.innerHTML = TOAST_ROLE_PRESETS
+    .map((role, i) => `<button type="button" class="category-chip${i === 0 ? " is-active" : ""}" data-role="${escapeHtml(role)}" aria-pressed="${i === 0 ? "true" : "false"}">${escapeHtml(role)}</button>`)
+    .join("");
+  wrap.querySelectorAll(".category-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      selectedToastRole = btn.dataset.role;
+      $("toast-custom-role").value = "";
+      wrap.querySelectorAll(".category-chip").forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle("is-active", active);
+        b.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    });
+  });
+  wrap.dataset.filled = "1";
+}
+renderToastRoleChips();
+
+$("toast-custom-role").addEventListener("input", () => {
+  const custom = $("toast-custom-role").value.trim();
+  if (custom) {
+    selectedToastRole = custom;
+    $("toast-role-chips").querySelectorAll(".category-chip").forEach((b) => {
+      b.classList.remove("is-active");
+      b.setAttribute("aria-pressed", "false");
+    });
+  }
+});
+
+$("btn-spin-toast").addEventListener("click", () => {
+  const pool = state.players || [];
+  if (pool.length === 0) return;
+  const role = ($("toast-custom-role").value.trim()) || selectedToastRole || TOAST_ROLE_PRESETS[0];
+
+  if (toastRouletteTimer) clearTimeout(toastRouletteTimer);
+  const display = $("toast-roulette-display");
+  display.hidden = false;
+  display.classList.remove("is-landing");
+  $("btn-spin-toast").disabled = true;
+
+  const TOTAL_STEPS = 16;
+  const finalPlayer = pool[Math.floor(Math.random() * pool.length)];
+  let step = 0;
+
+  function tick() {
+    step++;
+    const isLast = step >= TOTAL_STEPS;
+    const shown = isLast ? finalPlayer : pool[Math.floor(Math.random() * pool.length)];
+    display.textContent = `🍻 ${shown.name}`;
+
+    if (!isLast) {
+      const delay = 40 + Math.round(Math.pow(step / TOTAL_STEPS, 2) * 240);
+      toastRouletteTimer = setTimeout(tick, delay);
+      return;
+    }
+
+    display.classList.add("is-landing");
+    $("btn-spin-toast").disabled = false;
+    playCommandRevealEffect();
+
+    db.collection("rooms").doc(state.roomId).update({
+      toastRoulette: {
+        role,
+        winnerName: finalPlayer.name,
+        at: Date.now()
+      }
+    }).catch((err) => {
+      console.error(err);
+      showErrorBanner(friendlyErrorMessage(err));
+    });
+  }
+
+  tick();
+});
+
 $("btn-close-room").addEventListener("click", showRoomSummaryBeforeClose);
 $("btn-close-room-2").addEventListener("click", showRoomSummaryBeforeClose);
 
 async function showRoomSummaryBeforeClose() {
   try {
     const roomRef = db.collection("rooms").doc(state.roomId);
-    const [roomSnap, playersSnap, historySnap] = await Promise.all([
+    const [roomSnap, playersSnap, historySnap, momentsSnap] = await Promise.all([
       roomRef.get(),
       roomRef.collection("players").get(),
-      roomRef.collection("history").get()
+      roomRef.collection("history").get(),
+      roomRef.collection("moments").get()
     ]);
-    renderRoomSummary(roomSnap.data() || {}, playersSnap, historySnap);
+    renderRoomSummary(roomSnap.data() || {}, playersSnap, historySnap, momentsSnap);
     showScreen("screen-summary");
   } catch (err) {
     console.error(err);
@@ -313,7 +470,10 @@ async function showRoomSummaryBeforeClose() {
   }
 }
 
-function renderRoomSummary(room, playersSnap, historySnap) {
+let summaryGalleryItems = [];
+let summaryGalleryIndex = 0;
+
+function renderRoomSummary(room, playersSnap, historySnap, momentsSnap) {
   const nameByUid = {};
   playersSnap.forEach((doc) => { nameByUid[doc.id] = doc.data().name || "?"; });
 
@@ -338,14 +498,87 @@ function renderRoomSummary(room, playersSnap, historySnap) {
 
   const maxWeak = historyItems.reduce((max, item) => Math.max(max, item.weakCount || 0), 0);
   const weakHighlightEl = $("summary-weak-highlight");
+  let weakHighlightText = "";
   if (maxWeak > 0) {
     const topItem = historyItems.find((item) => (item.weakCount || 0) === maxWeak);
+    weakHighlightText = `😅 一番「弱いかも」と言われた命令(第${topItem.round}幕・${maxWeak}票): ${topItem.command}`;
     weakHighlightEl.hidden = false;
-    weakHighlightEl.textContent = `😅 一番「弱いかも」と言われた命令(第${topItem.round}幕・${maxWeak}票): ${topItem.command}`;
+    weakHighlightEl.textContent = weakHighlightText;
   } else {
     weakHighlightEl.hidden = true;
   }
+
+  // 📸 今日のベストショット(拍手が多い順 → ラウンド順)
+  const moments = [];
+  momentsSnap.forEach((doc) => moments.push(doc.data()));
+  moments.sort((a, b) => {
+    const clapDiff = Object.keys(b.claps || {}).length - Object.keys(a.claps || {}).length;
+    if (clapDiff !== 0) return clapDiff;
+    return (a.round || 0) - (b.round || 0);
+  });
+  summaryGalleryItems = moments;
+  summaryGalleryIndex = 0;
+  $("summary-gallery").hidden = moments.length === 0;
+  if (moments.length) renderSummaryGalleryFrame();
+
+  // 📋 コピー用の簡易レポートを組み立てておく
+  const reportLines = [
+    "🏮 王様ゲーム 今宵の記録",
+    `ラウンド数: ${historyItems.length}`,
+    "",
+    "👑 王様ランキング",
+    ...(ranking.length ? ranking.map((r, i) => `${i + 1}位 ${r.name}(${r.count}回)`) : ["記録なし"])
+  ];
+  if (weakHighlightText) reportLines.push("", weakHighlightText);
+  if (moments.length) {
+    reportLines.push("", "📸 印象に残った瞬間");
+    moments.slice(0, 5).forEach((m) => {
+      const claps = Object.keys(m.claps || {}).length;
+      reportLines.push(`・第${m.round}幕 ${m.comment || "(コメントなし)"}(👏${claps})`);
+    });
+  }
+  state.summaryReportText = reportLines.join("\n");
 }
+
+function renderSummaryGalleryFrame() {
+  const item = summaryGalleryItems[summaryGalleryIndex];
+  if (!item) return;
+  const img = $("summary-gallery-img");
+  if (item.photoDataUrl) {
+    img.src = item.photoDataUrl;
+    img.hidden = false;
+  } else {
+    img.hidden = true;
+  }
+  $("summary-gallery-comment").textContent = item.comment || "(コメントなし)";
+  const clapCount = Object.keys(item.claps || {}).length;
+  $("summary-gallery-meta").textContent = `第${item.round}幕・${item.authorName || ""}・👏${clapCount}`;
+  $("summary-gallery-position").textContent = `${summaryGalleryIndex + 1} / ${summaryGalleryItems.length}`;
+}
+
+$("btn-gallery-prev").addEventListener("click", () => {
+  if (!summaryGalleryItems.length) return;
+  summaryGalleryIndex = (summaryGalleryIndex - 1 + summaryGalleryItems.length) % summaryGalleryItems.length;
+  renderSummaryGalleryFrame();
+});
+
+$("btn-gallery-next").addEventListener("click", () => {
+  if (!summaryGalleryItems.length) return;
+  summaryGalleryIndex = (summaryGalleryIndex + 1) % summaryGalleryItems.length;
+  renderSummaryGalleryFrame();
+});
+
+$("btn-copy-report").addEventListener("click", async () => {
+  const text = state.summaryReportText || "";
+  try {
+    await navigator.clipboard.writeText(text);
+    showErrorBanner("レポートをコピーしました", true);
+  } catch (err) {
+    console.error(err);
+    showErrorBanner("コピーに失敗しました。手動で選択してコピーしてください。");
+  }
+});
+
 
 $("btn-confirm-close-room").addEventListener("click", async () => {
   $("btn-confirm-close-room").disabled = true;
@@ -354,10 +587,12 @@ $("btn-confirm-close-room").addEventListener("click", async () => {
     const playersSnap = await roomRef.collection("players").get();
     const historySnap = await roomRef.collection("history").get();
     const customTemplatesSnap = await roomRef.collection("customTemplates").get();
+    const momentsSnap = await roomRef.collection("moments").get();
     const batch = db.batch();
     playersSnap.forEach((doc) => batch.delete(doc.ref));
     historySnap.forEach((doc) => batch.delete(doc.ref));
     customTemplatesSnap.forEach((doc) => batch.delete(doc.ref));
+    momentsSnap.forEach((doc) => batch.delete(doc.ref));
     batch.delete(roomRef);
     await batch.commit();
   } catch (err) {
@@ -390,6 +625,12 @@ function resetToHome() {
   state.recentTemplateIndices = [];
   state.historyItems = [];
   state.customTemplates = [];
+  state.players = [];
+  state.lastToastAt = null;
+  state.momentsItems = [];
+  state.pendingMomentPhoto = null;
+  state.bannedKeywords = [];
+  state.localRulesNote = "";
   hideRoundIndicator();
   showScreen("screen-home");
 }
