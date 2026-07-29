@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link href="../css/common.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -34,6 +35,8 @@
       <h2>参加者を待っています</h2>
       <p class="hint">みんなにこのコードを伝えてね</p>
       <div id="roomCodeDisplay" class="room-code">----</div>
+      <div id="qrCode" class="qr-wrap"></div>
+      <p class="hint">スマホのカメラでQRコードを読み取ると、コード入力なしで参加できます</p>
       <div id="lobbyPlayerList" class="player-chip-list"></div>
       <p class="hint" id="lobbyCountHint">まだ誰も参加していません</p>
       <button id="btnStartGame" class="btn btn--primary" type="button" disabled>ゲーム開始(2人以上で押せます)</button>
@@ -42,9 +45,13 @@
 
   <!-- ============ ゲーム画面(卓全体表示) ============ -->
   <section id="screen-game" class="screen">
-    <div class="round-bar">
+    <div class="round-bar round-bar-row">
       <span id="roundLabel">ラウンド 1</span>
-      <span id="turnLabel" class="turn-label"></span>
+      <div class="round-bar-right">
+        <span id="turnLabel" class="turn-label"></span>
+        <span id="turnTimerDisplay" class="turn-timer"></span>
+        <button id="btnForceAdvance" class="btn btn--ghost btn--small" type="button">⏭ 強制的に進める</button>
+      </div>
     </div>
 
     <div id="eventBanner" class="event-banner hidden">
@@ -70,6 +77,7 @@
       <h2>🏮 結果発表 🏮</h2>
       <p>ディーラー 合計 <span id="resultDealerTotal" class="total-chip"></span></p>
       <ul id="resultList" class="result-list"></ul>
+      <p id="pendingPenaltyHint" class="hint hidden"></p>
       <div class="actions">
         <button id="btnNextRound" class="btn btn--primary" type="button">次のラウンドへ</button>
         <button id="btnEndRoom" class="btn" type="button">ルームを終了する</button>

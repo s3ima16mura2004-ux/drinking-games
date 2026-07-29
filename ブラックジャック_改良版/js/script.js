@@ -60,6 +60,29 @@ let eventTimerHandle = null;
 //結果画面で今どのプレイヤーの罰ゲームみくじを引いているか
 let penaltyTargetIndex = null;
 
+//そのラウンドの各プレイヤーの勝敗(結果画面を再描画するために保持しておく)
+let currentOutcomes = [];
+
+//呪いの一枚(ナチュラル21ボーナス)で今誰が呪いをかけようとしているか
+let curseCasterIndex = null;
+
+//画面スリープ防止(共有端末を回し飲みしている間にスリープしないように)
+let wakeLockRef = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLockRef = await navigator.wakeLock.request("screen");
+    }
+  } catch (e) {
+    //対応していない/取得できない場合は無視して続行する
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLockRef === null && el("screen-game")?.classList.contains("screen--active")) {
+    requestWakeLock();
+  }
+});
+
 /***********************************************
   2.要素の取得
 ************************************************/
@@ -91,6 +114,8 @@ window.addEventListener("load", () => {
 
   el("btnReplayRound").addEventListener("click", () => resetGame(true));
   el("btnReplayAll").addEventListener("click", () => resetGame(false));
+
+  el("btnCurseSkip").addEventListener("click", closeCurseModal);
 });
 
 //localStorageからカスタムイベント/罰ゲームリストを復元(あれば)
@@ -172,6 +197,11 @@ function makePlayer(name) {
     joker: false,
     immunity: false,
     swapToken: false,
+    natural: false,        // ナチュラル21(配られた2枚で21)だったか
+    curseUsed: false,       // 呪いの一枚をすでに使ったか
+    forcedPenalty: false,   // 呪いをかけられて罰ゲームみくじが確定しているか
+    penaltyDrawn: false,    // 罰ゲームみくじをすでに引いたか
+    penaltyText: null,
   };
 }
 
@@ -190,18 +220,38 @@ function beginRound() {
   players.forEach((p) => {
     p.cards = [];
     p.status = "waiting";
+    p.natural = false;
+    p.curseUsed = false;
+    p.forcedPenalty = false;
+    p.penaltyDrawn = false;
+    p.penaltyText = null;
     //ジョーカー・免罪符・交換チケットはラウンドをまたいで持ち越す
   });
 
   //最初に2枚ずつ配る(効果は発動させない)
   dealer.cards.push(deck.pop(), deck.pop());
-  players.forEach((p) => p.cards.push(deck.pop(), deck.pop()));
+  players.forEach((p) => {
+    p.cards.push(deck.pop(), deck.pop());
+    p.natural = getTotal(p.cards) === 21;
+  });
 
   currentIndex = 0;
-  players[0].status = "active";
+  requestWakeLock();
 
   el("roundLabel").textContent = `ラウンド ${round}`;
+  activatePlayer(0);
+}
+
+//手番プレイヤーをアクティブにする。ナチュラル21の場合は自動でスタンドする
+function activatePlayer(index) {
+  const p = players[index];
+  if (!p) return;
+  p.status = "active";
   render();
+  if (p.natural) {
+    showToast(`🌟 ${p.name} さん、ナチュラル21!`, true);
+    setTimeout(() => stand(index), 900);
+  }
 }
 
 function shuffleArray(arr) {
@@ -287,8 +337,7 @@ function advanceTurn() {
   if (currentIndex >= players.length) {
     dealerPlay();
   } else {
-    players[currentIndex].status = "active";
-    render();
+    activatePlayer(currentIndex);
   }
 }
 
@@ -328,9 +377,10 @@ function applyCardEffect(index, card) {
 }
 
 let toastHideHandle = null;
-function showToast(message) {
+function showToast(message, isNatural) {
   const toast = el("effectToast");
   toast.textContent = message;
+  toast.classList.toggle("is-natural", !!isNatural);
   toast.classList.add("is-visible");
   clearTimeout(toastHideHandle);
   toastHideHandle = setTimeout(() => toast.classList.remove("is-visible"), 3200);
@@ -458,9 +508,16 @@ function dealerDrawStep() {
   }
 }
 
-function judgeAgainstDealer(playerHand, dealerTotal) {
-  const myTotal = getTotal(playerHand);
+function judgeAgainstDealer(player, dealerHand) {
+  const myTotal = getTotal(player.cards);
+  const dealerTotal = getTotal(dealerHand);
+  const dealerNatural = dealerHand.length === 2 && dealerTotal === 21;
+
   if (myTotal > 21) return "lose";
+  //ナチュラル21同士は引き分け、片方だけなら自動的にその人の勝ち
+  if (player.natural && dealerNatural) return "draw";
+  if (player.natural) return "win";
+  if (dealerNatural) return "lose";
   if (dealerTotal > 21) return "win";
   if (myTotal > dealerTotal) return "win";
   if (myTotal < dealerTotal) return "lose";
@@ -468,21 +525,26 @@ function judgeAgainstDealer(playerHand, dealerTotal) {
 }
 
 function showResults() {
-  const dealerTotal = getTotal(dealer.cards);
-  el("resultDealerTotal").textContent = dealerTotal;
+  el("resultDealerTotal").textContent = getTotal(dealer.cards);
+  //このラウンドの勝敗を1回だけ計算し、以後は再描画のたびに使い回す
+  currentOutcomes = players.map((p) => judgeAgainstDealer(p, dealer.cards));
+  renderResultList();
+  showScreen("screen-result");
+}
 
+function renderResultList() {
   const list = el("resultList");
   list.innerHTML = "";
 
   players.forEach((p, i) => {
-    const outcome = judgeAgainstDealer(p.cards, dealerTotal);
+    const outcome = currentOutcomes[i];
     const li = document.createElement("li");
     li.className = `result-item ${outcome}`;
 
     const label = outcome === "win" ? "勝ち" : outcome === "lose" ? "負け" : "引き分け";
     const side = document.createElement("div");
     side.className = "side";
-    side.innerHTML = `<strong>${p.name}</strong><span>合計 ${getTotal(p.cards)}</span>`;
+    side.innerHTML = `<strong>${p.name}</strong><span>合計 ${getTotal(p.cards)}</span>${p.natural ? ' <span class="badge" title="ナチュラル21">🌟</span>' : ""}`;
     li.appendChild(side);
 
     const right = document.createElement("div");
@@ -492,26 +554,67 @@ function showResults() {
     outcomeSpan.textContent = label;
     right.appendChild(outcomeSpan);
 
-    if (outcome === "lose") {
-      if (p.immunity) {
+    //通常の負け、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
+    const needsPenalty = outcome === "lose" || p.forcedPenalty;
+    if (needsPenalty) {
+      if (p.penaltyDrawn) {
+        const doneSpan = document.createElement("span");
+        doneSpan.textContent = p.penaltyText || "";
+        right.appendChild(doneSpan);
+      } else if (p.immunity) {
         p.immunity = false;
+        p.penaltyDrawn = true;
+        p.penaltyText = "🛡 御守りで回避!";
         const safe = document.createElement("span");
-        safe.textContent = "🛡 御守りで回避!";
+        safe.textContent = p.penaltyText;
         right.appendChild(safe);
       } else {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn btn--red";
-        btn.textContent = "罰ゲームみくじを引く";
+        btn.textContent = outcome === "lose" ? "罰ゲームみくじを引く" : "🌟 呪いの罰ゲームみくじを引く";
         btn.addEventListener("click", () => openPenaltyModal(i));
         right.appendChild(btn);
       }
     }
+
+    //ナチュラル21で勝った人は、まだ呪いを使っていなければ誰かに追加の罰ゲームを押し付けられる
+    if (p.natural && outcome === "win" && !p.curseUsed && players.length > 1) {
+      const curseBtn = document.createElement("button");
+      curseBtn.type = "button";
+      curseBtn.className = "btn btn--gold btn--small";
+      curseBtn.textContent = "🌟 呪いをかける";
+      curseBtn.addEventListener("click", () => openCurseModal(i));
+      right.appendChild(curseBtn);
+    }
+
     li.appendChild(right);
     list.appendChild(li);
   });
 
-  showScreen("screen-result");
+  updatePendingPenaltyHint();
+}
+
+//全員が罰ゲームみくじを引き終わるまで「次のラウンドへ」を押せないようにする
+function updatePendingPenaltyHint() {
+  let pending = 0;
+  players.forEach((p, i) => {
+    const outcome = currentOutcomes[i];
+    const needsPenalty = outcome === "lose" || p.forcedPenalty;
+    if (needsPenalty && !p.penaltyDrawn) pending++;
+  });
+
+  const hintEl = el("pendingPenaltyHint");
+  const btn = el("btnReplayRound");
+  if (pending > 0) {
+    hintEl.textContent = `まだ${pending}人が罰ゲームみくじを引いていません`;
+    hintEl.classList.remove("hidden");
+    hintEl.classList.add("is-warning");
+    btn.disabled = true;
+  } else {
+    hintEl.classList.add("hidden");
+    btn.disabled = false;
+  }
 }
 
 /***********************************************
@@ -541,12 +644,53 @@ function drawPenaltyOmikuji() {
     resultEl.classList.remove("hidden");
     el("btnPenaltyClose").classList.remove("hidden");
     box.style.pointerEvents = "";
+
+    if (penaltyTargetIndex !== null) {
+      const p = players[penaltyTargetIndex];
+      p.penaltyDrawn = true;
+      p.penaltyText = text;
+    }
   }, 600);
 }
 
 function closePenaltyModal() {
   el("modalPenalty").classList.add("hidden");
   penaltyTargetIndex = null;
+  renderResultList();
+}
+
+/***********************************************
+  11-2.呪いの一枚(ナチュラル21ボーナス)
+************************************************/
+
+function openCurseModal(casterIndex) {
+  curseCasterIndex = casterIndex;
+  const wrap = el("curseTargets");
+  wrap.innerHTML = "";
+  players.forEach((other, i) => {
+    if (i === casterIndex) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `${other.name} さんに呪いをかける`;
+    btn.addEventListener("click", () => applyCurse(casterIndex, i));
+    wrap.appendChild(btn);
+  });
+  el("modalCurse").classList.remove("hidden");
+}
+
+function closeCurseModal() {
+  el("modalCurse").classList.add("hidden");
+  curseCasterIndex = null;
+}
+
+function applyCurse(casterIndex, targetIndex) {
+  players[casterIndex].curseUsed = true;
+  players[targetIndex].forcedPenalty = true;
+  showToast(`🌟 ${players[casterIndex].name} が ${players[targetIndex].name} さんに呪いをかけた!`);
+  el("modalCurse").classList.add("hidden");
+  curseCasterIndex = null;
+  renderResultList();
 }
 
 /***********************************************

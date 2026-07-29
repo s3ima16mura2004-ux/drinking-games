@@ -299,3 +299,25 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   .card-row img { width: 2.5rem; }
   .card-row--large img { width: 3rem; }
 }
+/* ==========================================================
+   追加分:ナチュラル21・エラートースト・呪いモーダル
+   ========================================================== */
+
+.toast.is-natural {
+  border-color: var(--gold-soft);
+  background: radial-gradient(circle at 50% 0%, rgba(236,210,145,0.35), var(--ink) 70%);
+  animation: sparkle-pop 0.5s ease;
+}
+@keyframes sparkle-pop {
+  0% { transform: translateX(-50%) translateY(0) scale(0.9); }
+  40% { transform: translateX(-50%) translateY(0) scale(1.08); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.toast.is-error {
+  border-color: var(--red);
+  color: var(--red-soft);
+  background: rgba(184,54,42,0.14);
+}
+
+.hint.is-warning { color: var(--red-soft); }

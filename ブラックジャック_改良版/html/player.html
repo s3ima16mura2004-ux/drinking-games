@@ -45,9 +45,12 @@
 
   <!-- ============ ゲーム画面(自分の手札のみ) ============ -->
   <section id="screen-game" class="screen">
-    <div class="round-bar">
+    <div class="round-bar round-bar-row">
       <span id="roundLabel">ラウンド 1</span>
-      <span id="turnLabel" class="turn-label"></span>
+      <div class="round-bar-right">
+        <span id="turnLabel" class="turn-label"></span>
+        <span id="turnTimerDisplay" class="turn-timer"></span>
+      </div>
     </div>
 
     <div id="eventBanner" class="event-banner hidden">
@@ -94,6 +97,11 @@
       <p>ディーラー 合計 <span id="resultDealerTotal" class="total-chip"></span></p>
       <p id="myOutcome" class="modal-text"></p>
 
+      <div id="curseArea" class="hidden">
+        <p class="hint">🌟 ナチュラル21のボーナスです。誰か一人に追加の罰ゲームみくじを引かせられます。</p>
+        <button id="btnCurse" class="btn btn--gold btn--small" type="button">🌟 呪いをかける</button>
+      </div>
+
       <div id="penaltyArea" class="hidden">
         <div id="omikujiBox" class="omikuji-box">
           <span class="omikuji-box__lid">🪵</span>
@@ -114,6 +122,15 @@
     <p class="modal-eyebrow">🔄 交換する相手を選ぼう</p>
     <div id="swapTargets" class="swap-targets"></div>
     <button id="btnSwapCancel" class="btn" type="button">やめる</button>
+  </div>
+</div>
+
+<!-- 呪いの一枚(ナチュラル21ボーナス)用モーダル -->
+<div id="modalCurse" class="modal-overlay hidden">
+  <div class="modal">
+    <p class="modal-eyebrow">🌟 呪いをかける相手を選ぼう</p>
+    <div id="curseTargets" class="swap-targets"></div>
+    <button id="btnCurseCancel" class="btn" type="button">やめる</button>
   </div>
 </div>
 

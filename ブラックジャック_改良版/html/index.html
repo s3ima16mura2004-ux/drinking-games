@@ -85,6 +85,7 @@
       <h2>🏮 結果発表 🏮</h2>
       <p>ディーラー 合計 <span id="resultDealerTotal" class="total-chip"></span></p>
       <ul id="resultList" class="result-list"></ul>
+      <p id="pendingPenaltyHint" class="hint hidden"></p>
       <div class="actions">
         <button id="btnReplayRound" class="btn btn--primary" type="button">同じメンバーでもう1回</button>
         <button id="btnReplayAll" class="btn" type="button">最初からやり直す</button>
@@ -133,6 +134,16 @@
     <p class="modal-eyebrow">🔄 交換する相手を選ぼう</p>
     <div id="swapTargets" class="swap-targets"></div>
     <button id="btnSwapCancel" class="btn" type="button">やめる</button>
+  </div>
+</div>
+
+<!-- 呪いの一枚(ナチュラル21ボーナス)モーダル -->
+<div id="modalCurse" class="modal-overlay hidden">
+  <div class="modal">
+    <p class="modal-eyebrow">🌟 呪いの一枚 🌟</p>
+    <p class="hint">ナチュラル21のボーナス!誰か一人に追加で罰ゲームみくじを引かせよう(任意)</p>
+    <div id="curseTargets" class="swap-targets"></div>
+    <button id="btnCurseSkip" class="btn" type="button">使わない</button>
   </div>
 </div>
 

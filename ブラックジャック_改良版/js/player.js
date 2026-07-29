@@ -19,6 +19,7 @@ let myName = "";
 let roomState = null;      // rooms/{code} の最新データ
 let playersData = {};      // { playerId: {name, cards, status, ...} }
 let eventTickHandle = null;
+let turnTickHandle = null;
 let lastKnownStatus = null;
 let omikujiTapped = false;
 
@@ -36,12 +37,74 @@ window.addEventListener("load", () => {
   el("btnEventSuccess").addEventListener("click", () => sendAction("eventResult", { success: true }));
   el("btnEventFail").addEventListener("click", () => sendAction("eventResult", { success: false }));
   el("omikujiBox").addEventListener("click", tapOmikuji);
+  el("btnCurse").addEventListener("click", openCurseModal);
+  el("btnCurseCancel").addEventListener("click", closeCurseModal);
 
   //入力補助:ルームコードは自動で大文字に
   el("inputRoomCode").addEventListener("input", (e) => {
     e.target.value = e.target.value.toUpperCase();
   });
+
+  //QRコード経由(?code=XXXX)で開かれた場合はルームコードを自動入力する
+  const params = new URLSearchParams(location.search);
+  const codeParam = params.get("code");
+  if (codeParam) {
+    el("inputRoomCode").value = codeParam.toUpperCase();
+    el("inputName").focus();
+  }
+
+  //画面ロック・リロード後に同じ部屋へ自動で再接続を試みる
+  tryAutoRejoin();
 });
+
+//画面スリープ防止(自分の番が来ているのに画面が消えないように)
+let wakeLockRef = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) wakeLockRef = await navigator.wakeLock.request("screen");
+  } catch (e) { /* 対応していない場合は無視 */ }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLockRef === null && roomRef) requestWakeLock();
+});
+
+/***********************************************
+  1-2.リロード・画面ロック後の自動再接続
+************************************************/
+
+async function tryAutoRejoin() {
+  let info;
+  try {
+    const stored = localStorage.getItem("bj_party_lastRoom");
+    if (!stored) return;
+    info = JSON.parse(stored);
+  } catch (e) { return; }
+  if (!info || !info.code) return;
+
+  try {
+    const ref = doc(db, "rooms", info.code);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { localStorage.removeItem("bj_party_lastRoom"); return; }
+
+    const storageKey = `bj_party_playerId_${info.code}`;
+    const pid = localStorage.getItem(storageKey);
+    if (!pid) return;
+    const pSnap = await getDoc(doc(ref, "players", pid));
+    if (!pSnap.exists()) { localStorage.removeItem("bj_party_lastRoom"); return; }
+
+    roomCode = info.code;
+    roomRef = ref;
+    myId = pid;
+    myName = pSnap.data().name || info.name || "";
+
+    subscribeRoom();
+    subscribePlayers();
+    requestWakeLock();
+  } catch (e) {
+    //再接続に失敗しても通常の参加画面のまま操作を続けられるようにする
+    console.error("自動再接続エラー", e);
+  }
+}
 
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("screen--active"));
@@ -52,6 +115,17 @@ function showJoinError(message) {
   const errEl = el("joinError");
   errEl.textContent = message;
   errEl.classList.remove("hidden");
+}
+
+let toastHideHandle = null;
+function showToast(message, kind) {
+  const toast = el("effectToast");
+  toast.textContent = message;
+  toast.classList.toggle("is-error", kind === "error");
+  toast.classList.toggle("is-natural", kind === "natural");
+  toast.classList.add("is-visible");
+  clearTimeout(toastHideHandle);
+  toastHideHandle = setTimeout(() => toast.classList.remove("is-visible"), 3200);
 }
 
 /***********************************************
@@ -66,33 +140,46 @@ async function joinRoom() {
   if (code.length !== 4) { showJoinError("ルームコードは4文字です。"); return; }
   if (!name) { showJoinError("名前を入力してください。"); return; }
 
-  const ref = doc(db, "rooms", code);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) { showJoinError("そのルームは見つかりませんでした。コードを確認してください。"); return; }
-  if (snap.data().status !== "lobby") { showJoinError("このルームはすでにゲームが始まっています。"); return; }
+  el("btnJoin").disabled = true;
+  try {
+    const ref = doc(db, "rooms", code);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { showJoinError("そのルームは見つかりませんでした。コードを確認してください。"); return; }
+    if (snap.data().status !== "lobby") { showJoinError("このルームはすでにゲームが始まっています。"); return; }
 
-  roomCode = code;
-  roomRef = ref;
-  myName = name;
+    roomCode = code;
+    roomRef = ref;
+    myName = name;
 
-  //同じ端末での再参加を許容するため、ルームごとにIDを保持しておく
-  const storageKey = `bj_party_playerId_${roomCode}`;
-  myId = localStorage.getItem(storageKey);
-  if (!myId) {
-    myId = crypto.randomUUID();
-    localStorage.setItem(storageKey, myId);
+    //同じ端末での再参加を許容するため、ルームごとにIDを保持しておく
+    const storageKey = `bj_party_playerId_${roomCode}`;
+    myId = localStorage.getItem(storageKey);
+    if (!myId) {
+      myId = crypto.randomUUID();
+      localStorage.setItem(storageKey, myId);
+    }
+
+    await setDoc(doc(roomRef, "players", myId), {
+      name: myName,
+      joinedAt: Date.now(),
+      cards: [], status: "waiting", joker: false, immunity: false,
+      swapToken: false, outcome: null, penaltyText: null,
+      natural: false, curseUsed: false, forcedPenalty: false,
+    }, { merge: true });
+
+    //リロード・画面ロック後に自動で同じ部屋へ戻れるように保存しておく
+    localStorage.setItem("bj_party_lastRoom", JSON.stringify({ code: roomCode, name: myName }));
+
+    subscribeRoom();
+    subscribePlayers();
+    requestWakeLock();
+    showScreen("screen-waiting");
+  } catch (e) {
+    console.error("参加エラー", e);
+    showJoinError("通信エラーが発生しました。電波状況を確認してもう一度お試しください。");
+  } finally {
+    el("btnJoin").disabled = false;
   }
-
-  await setDoc(doc(roomRef, "players", myId), {
-    name: myName,
-    joinedAt: Date.now(),
-    cards: [], status: "waiting", joker: false, immunity: false,
-    swapToken: false, outcome: null, penaltyText: null,
-  }, { merge: true });
-
-  subscribeRoom();
-  subscribePlayers();
-  showScreen("screen-waiting");
 }
 
 /***********************************************
@@ -101,9 +188,19 @@ async function joinRoom() {
 
 function subscribeRoom() {
   onSnapshot(roomRef, (snap) => {
-    if (!snap.exists()) return;
+    if (!snap.exists()) {
+      //ホストがルームを終了した場合は参加画面に戻す
+      localStorage.removeItem("bj_party_lastRoom");
+      roomState = null;
+      showJoinError("ホストがルームを終了しました。もう一度参加してください。");
+      showScreen("screen-join");
+      return;
+    }
     roomState = snap.data();
     render();
+  }, (error) => {
+    console.error("ルーム購読エラー", error);
+    showToast("⚠️ 接続が不安定です。電波状況をご確認ください。", "error");
   });
 }
 
@@ -112,6 +209,9 @@ function subscribePlayers() {
     playersData = {};
     snap.forEach((d) => { playersData[d.id] = d.data(); });
     render();
+  }, (error) => {
+    console.error("プレイヤー購読エラー", error);
+    showToast("⚠️ 接続が不安定です。電波状況をご確認ください。", "error");
   });
 }
 
@@ -120,9 +220,14 @@ function subscribePlayers() {
 ************************************************/
 
 async function sendAction(type, payload) {
-  await addDoc(collection(roomRef, "actions"), {
-    type, playerId: myId, payload: payload || {}, ts: Date.now(),
-  });
+  try {
+    await addDoc(collection(roomRef, "actions"), {
+      type, playerId: myId, payload: payload || {}, ts: Date.now(),
+    });
+  } catch (e) {
+    console.error("アクション送信エラー", e);
+    showToast("⚠️ 送信に失敗しました。もう一度お試しください。", "error");
+  }
 }
 
 /***********************************************
@@ -250,6 +355,7 @@ function render() {
   const activePid = roomState.order[roomState.currentIndex];
   const isMyTurn = activePid === myId;
   el("turnLabel").textContent = isMyTurn ? "あなたの番です!" : (activePid ? `手番: ${playersData[activePid]?.name || ""} さん` : "ディーラーの番です…");
+  renderTurnTimer(activePid);
 
   el("dealerTotal").textContent = getTotal(roomState.dealer.cards);
   renderCardRow("dealerCards", roomState.dealer.cards);
@@ -261,6 +367,7 @@ function render() {
 
   const badges = el("myBadges");
   badges.innerHTML = "";
+  if (me.natural) badges.innerHTML += `<span class="badge" title="ナチュラル21">🌟</span>`;
   if (me.joker) badges.innerHTML += `<span class="badge" title="ジョーカー">🎭</span>`;
   if (me.immunity) badges.innerHTML += `<span class="badge" title="御守り">🛡</span>`;
   if (me.swapToken) badges.innerHTML += `<span class="badge" title="交換チケット">🔄</span>`;
@@ -273,6 +380,25 @@ function render() {
 
   renderEventBanner();
   renderOtherPlayers(activePid);
+}
+
+function renderTurnTimer(activePid) {
+  const timerEl = el("turnTimerDisplay");
+  if (!timerEl) return;
+  clearInterval(turnTickHandle);
+  if (!activePid || !roomState.turnStartedAt || roomState.activeEvent) {
+    timerEl.textContent = "";
+    return;
+  }
+  const TURN_TIMEOUT_SEC = 45;
+  const tick = () => {
+    const elapsed = Math.floor((Date.now() - roomState.turnStartedAt) / 1000);
+    const remaining = Math.max(0, TURN_TIMEOUT_SEC - elapsed);
+    timerEl.textContent = `⏱ ${remaining}秒`;
+    timerEl.classList.toggle("is-low", remaining <= 10);
+  };
+  tick();
+  turnTickHandle = setInterval(tick, 1000);
 }
 
 function renderEventBanner() {
@@ -312,7 +438,8 @@ function renderOtherPlayers(activePid) {
     }[p.status] || p.status;
     const li = document.createElement("li");
     if (pid === activePid) li.classList.add("is-active");
-    li.innerHTML = `<span>${p.name}</span><span>${statusText} ・ 合計 ${getTotal(p.cards)}</span>`;
+    const naturalMark = p.natural ? " 🌟" : "";
+    li.innerHTML = `<span>${p.name}${naturalMark}</span><span>${statusText} ・ 合計 ${getTotal(p.cards)}</span>`;
     list.appendChild(li);
   });
 }
@@ -323,10 +450,18 @@ function renderResult() {
 
   const me = playersData[myId];
   const outcomeLabel = { win: "🎉 あなたの勝ちです!", lose: "😢 あなたの負けです…", draw: "🤝 引き分けです" }[me?.outcome] || "";
-  el("myOutcome").textContent = `${outcomeLabel}(あなたの合計: ${getTotal(me?.cards)})`;
+  const naturalNote = me?.natural ? " 🌟ナチュラル21!" : "";
+  el("myOutcome").textContent = `${outcomeLabel}${naturalNote}(あなたの合計: ${getTotal(me?.cards)})`;
 
+  //ナチュラル21で勝った場合、まだ呪いを使っていなければボーナスを提示する
+  const curseArea = el("curseArea");
+  const canCurse = !!(me?.natural && me?.outcome === "win" && !me?.curseUsed && roomState.order.length > 1);
+  curseArea.classList.toggle("hidden", !canCurse);
+
+  //通常の負け、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
+  const needsPenalty = !!(me && (me.outcome === "lose" || me.forcedPenalty));
   const penaltyArea = el("penaltyArea");
-  if (me?.outcome === "lose") {
+  if (needsPenalty) {
     penaltyArea.classList.remove("hidden");
     if (me.penaltyText) {
       el("omikujiBox").classList.add("hidden");
@@ -336,4 +471,32 @@ function renderResult() {
   } else {
     penaltyArea.classList.add("hidden");
   }
+}
+
+/***********************************************
+  8.呪いの一枚(ナチュラル21ボーナス)
+************************************************/
+
+function openCurseModal() {
+  const me = playersData[myId];
+  if (!me || !me.natural || me.outcome !== "win" || me.curseUsed) return;
+  const wrap = el("curseTargets");
+  wrap.innerHTML = "";
+  Object.keys(playersData).forEach((pid) => {
+    if (pid === myId) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `${playersData[pid].name} さんに呪いをかける`;
+    btn.addEventListener("click", () => {
+      sendAction("curse", { targetId: pid });
+      closeCurseModal();
+    });
+    wrap.appendChild(btn);
+  });
+  el("modalCurse").classList.remove("hidden");
+}
+
+function closeCurseModal() {
+  el("modalCurse").classList.add("hidden");
 }

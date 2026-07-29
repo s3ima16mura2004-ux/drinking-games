@@ -20,6 +20,8 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const EVENT_CHANCE = 0.25;
 const EVENT_SECONDS = 15;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // 紛らわしい 0/O, 1/I は除外
+const TURN_TIMEOUT_SEC = 45; // この秒数操作がないと自動でスタンドする
+const EVENT_TIMEOUT_BUFFER_SEC = 2; // ちょうちんタイムの制限時間+この秒数で自動的に続行する
 
 const DEFAULT_EVENTS = [
   "早口言葉「生麦生米生卵」を3回連続で言おう",
@@ -64,6 +66,7 @@ let state = {
   eventList: DEFAULT_EVENTS,
   penaltyList: DEFAULT_PENALTIES,
   activeEvent: null, // { playerId, text, startedAt, durationSec }
+  turnStartedAt: null, // 現在の手番が始まった時刻(放置検知用)
 };
 
 //プレイヤーIDをキーにした手札等の情報
@@ -75,15 +78,47 @@ let pendingAfterEvent = null;
 let lobbyPlayersUnsub = null;
 let eventTickHandle = null;
 
+//放置タイムアウトの二重発火を防ぐガード
+let turnTimeoutFired = false;
+let eventTimeoutFired = false;
+
+//画面スリープ防止
+let wakeLockRef = null;
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLockRef = await navigator.wakeLock.request("screen");
+    }
+  } catch (e) {
+    //対応していない/取得できない場合は無視する
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wakeLockRef === null && roomRef) {
+    requestWakeLock();
+  }
+});
+
 /***********************************************
   3.初期化
 ************************************************/
 window.addEventListener("load", () => {
-  el("btnCreateRoom").addEventListener("click", createRoom);
-  el("btnStartGame").addEventListener("click", startGame);
-  el("btnNextRound").addEventListener("click", nextRound);
-  el("btnEndRoom").addEventListener("click", endRoom);
+  el("btnCreateRoom").addEventListener("click", () => safeHostAction(createRoom));
+  el("btnStartGame").addEventListener("click", () => safeHostAction(startGame));
+  el("btnNextRound").addEventListener("click", () => safeHostAction(nextRound));
+  el("btnEndRoom").addEventListener("click", () => safeHostAction(endRoom));
+  el("btnForceAdvance").addEventListener("click", () => safeHostAction(forceAdvanceTurn));
 });
+
+//ホストの操作をまとめて try/catch し、通信エラー時にトーストで知らせる
+async function safeHostAction(fn) {
+  try {
+    await fn();
+  } catch (e) {
+    console.error("ホスト操作エラー", e);
+    showHostToast("⚠️ 通信エラーが発生しました。もう一度お試しください。", true);
+  }
+}
 
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("screen--active"));
@@ -123,6 +158,7 @@ async function createRoom() {
     eventList: DEFAULT_EVENTS,
     penaltyList: DEFAULT_PENALTIES,
     activeEvent: null,
+    turnStartedAt: null,
     createdAt: Date.now(),
   });
 
@@ -130,6 +166,26 @@ async function createRoom() {
   showScreen("screen-lobby");
   subscribeLobbyPlayers();
   subscribeActions();
+  requestWakeLock();
+  renderJoinQrCode();
+}
+
+//参加用QRコードを表示する(対応スマホのカメラで読み取ればコード入力なしで参加画面へ)
+function renderJoinQrCode() {
+  const wrap = el("qrCode");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const joinUrl = new URL(`player.html?code=${roomCode}`, location.href).href;
+  if (window.QRCode) {
+    // eslint-disable-next-line no-new
+    new QRCode(wrap, { text: joinUrl, width: 160, height: 160 });
+  } else {
+    //ライブラリが読み込めなかった場合はURLをテキストで表示する
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = joinUrl;
+    wrap.appendChild(p);
+  }
 }
 
 function subscribeLobbyPlayers() {
@@ -142,6 +198,7 @@ function subscribeLobbyPlayers() {
         joinedAt: d.data().joinedAt,
         cards: [], status: "waiting", joker: false, immunity: false,
         swapToken: false, outcome: null, penaltyText: null,
+        natural: false, curseUsed: false, forcedPenalty: false,
       };
     });
     renderLobby();
@@ -192,6 +249,7 @@ async function drainActionQueue() {
       await handleAction(action.data);
     } catch (e) {
       console.error("アクション処理エラー", e);
+      showHostToast("⚠️ プレイヤーの操作の反映に失敗しました", true);
     }
     try {
       await deleteDoc(doc(roomRef, "actions", action.id));
@@ -210,6 +268,7 @@ async function handleAction(action) {
   else if (type === "swap") await doSwap(playerId, payload && payload.targetId);
   else if (type === "eventResult") await doEventResult(playerId, payload && payload.success);
   else if (type === "penaltyDraw") await doPenaltyDraw(playerId);
+  else if (type === "curse") await doCurse(playerId, payload && payload.targetId);
 }
 
 /***********************************************
@@ -238,17 +297,34 @@ async function beginRound() {
     p.status = "waiting";
     p.outcome = null;
     p.penaltyText = null;
+    p.natural = false;
+    p.curseUsed = false;
+    p.forcedPenalty = false;
     //ジョーカー・御守り・交換チケットはラウンドをまたいで持ち越す
   });
 
   state.dealer.cards.push(drawCard(), drawCard());
-  state.order.forEach((pid) => playersMap[pid].cards.push(drawCard(), drawCard()));
+  state.order.forEach((pid) => {
+    const p = playersMap[pid];
+    p.cards.push(drawCard(), drawCard());
+    p.natural = getTotal(p.cards) === 21;
+  });
 
   state.currentIndex = 0;
   playersMap[state.order[0]].status = "active";
   state.status = "playing";
+  state.turnStartedAt = Date.now();
+  turnTimeoutFired = false;
+  eventTimeoutFired = false;
 
   await persistAll();
+  startTimerWatchdog();
+
+  //先頭がナチュラル21なら自動でスタンドさせる(結果画面で呪いをかけられる)
+  if (playersMap[state.order[0]].natural) {
+    showHostToast(`🌟 ${playersMap[state.order[0]].name} さん、ナチュラル21!`, false, true);
+    setTimeout(() => safeHostAction(() => doStand(state.order[0])), 900);
+  }
 }
 
 function freshDeck() {
@@ -331,12 +407,33 @@ async function advanceTurn() {
     } else break;
   }
   if (state.currentIndex >= state.order.length) {
+    state.turnStartedAt = null;
     await persistAll();
     await dealerPlay();
   } else {
-    playersMap[state.order[state.currentIndex]].status = "active";
+    const nextPid = state.order[state.currentIndex];
+    playersMap[nextPid].status = "active";
+    state.turnStartedAt = Date.now();
+    turnTimeoutFired = false;
     await persistAll();
+
+    if (playersMap[nextPid].natural) {
+      showHostToast(`🌟 ${playersMap[nextPid].name} さん、ナチュラル21!`, false, true);
+      setTimeout(() => safeHostAction(() => doStand(nextPid)), 900);
+    }
   }
+}
+
+//ホストが手動でその場のプレイヤーの手番を強制的に終わらせる(離席・放置対策)
+async function forceAdvanceTurn() {
+  const activePid = state.order[state.currentIndex];
+  if (!activePid) return;
+  if (state.activeEvent) {
+    //ちょうちんタイム中なら、それを先に強制終了させる
+    await doEventResult(state.activeEvent.playerId, false);
+    return;
+  }
+  await doStand(activePid);
 }
 
 /***********************************************
@@ -381,6 +478,7 @@ async function doJoker(playerId) {
   state.activeEvent = {
     playerId, text: randomFrom(state.eventList), startedAt: Date.now(), durationSec: EVENT_SECONDS,
   };
+  eventTimeoutFired = false;
   pendingAfterEvent = null; //手動発動はターン進行を止めない
   await persistAll();
 }
@@ -413,6 +511,7 @@ async function maybeTriggerMiniEvent(playerId, thenFn) {
     state.activeEvent = {
       playerId, text: randomFrom(state.eventList), startedAt: Date.now(), durationSec: EVENT_SECONDS,
     };
+    eventTimeoutFired = false;
     pendingAfterEvent = thenFn;
     await persistAll();
   } else {
@@ -426,6 +525,9 @@ async function doEventResult(playerId, success) {
   showHostToast(success ? "🎉 成功!盛り上がったところで続行!" : "😅 残念…続行!");
   const cont = pendingAfterEvent;
   pendingAfterEvent = null;
+  //イベント解決後、次の手番の放置タイマーをここから数え直す
+  state.turnStartedAt = Date.now();
+  turnTimeoutFired = false;
   await persistAll();
   if (cont) await cont();
 }
@@ -453,11 +555,16 @@ async function dealerStep() {
 
 async function computeResults() {
   const dealerTotal = getTotal(state.dealer.cards);
+  const dealerNatural = state.dealer.cards.length === 2 && dealerTotal === 21;
   state.order.forEach((pid) => {
     const p = playersMap[pid];
     const myTotal = getTotal(p.cards);
     let outcome;
     if (myTotal > 21) outcome = "lose";
+    //ナチュラル21同士は引き分け、片方だけなら自動的にその人の勝ち
+    else if (p.natural && dealerNatural) outcome = "draw";
+    else if (p.natural) outcome = "win";
+    else if (dealerNatural) outcome = "lose";
     else if (dealerTotal > 21) outcome = "win";
     else if (myTotal > dealerTotal) outcome = "win";
     else if (myTotal < dealerTotal) outcome = "lose";
@@ -465,12 +572,16 @@ async function computeResults() {
     p.outcome = outcome;
   });
   state.status = "result";
+  state.turnStartedAt = null;
+  stopTimerWatchdog();
   await persistAll();
 }
 
 async function doPenaltyDraw(playerId) {
   const p = playersMap[playerId];
-  if (!p || p.outcome !== "lose") return;
+  if (!p) return;
+  const needsPenalty = p.outcome === "lose" || p.forcedPenalty;
+  if (!needsPenalty || p.penaltyText) return; //対象外、またはすでに引いている
   if (p.immunity) {
     p.immunity = false;
     p.penaltyText = "🛡 御守りで回避!";
@@ -481,6 +592,18 @@ async function doPenaltyDraw(playerId) {
   renderHost();
 }
 
+//ナチュラル21の勝者が誰かに罰ゲームみくじを押し付ける「呪いの一枚」
+async function doCurse(casterId, targetId) {
+  const caster = playersMap[casterId];
+  const target = targetId && playersMap[targetId];
+  if (!caster || !target || !caster.natural || caster.outcome !== "win" || caster.curseUsed) return;
+  if (targetId === casterId) return;
+  caster.curseUsed = true;
+  target.forcedPenalty = true;
+  showHostToast(`🌟 ${caster.name} が ${target.name} さんに呪いをかけた!`);
+  await persistAll();
+}
+
 async function nextRound() {
   state.round++;
   showScreen("screen-game");
@@ -488,11 +611,52 @@ async function nextRound() {
 }
 
 async function endRoom() {
+  stopTimerWatchdog();
   for (const pid of state.order) {
     try { await deleteDoc(doc(roomRef, "players", pid)); } catch (e) { /* noop */ }
   }
   try { await deleteDoc(roomRef); } catch (e) { /* noop */ }
   location.reload();
+}
+
+/***********************************************
+  11-2.放置検知ウォッチドッグ(手番タイムアウト・ちょうちんタイムタイムアウト)
+************************************************/
+
+let watchdogHandle = null;
+
+function startTimerWatchdog() {
+  stopTimerWatchdog();
+  watchdogHandle = setInterval(tickWatchdog, 1000);
+}
+
+function stopTimerWatchdog() {
+  clearInterval(watchdogHandle);
+  watchdogHandle = null;
+}
+
+function tickWatchdog() {
+  if (state.status !== "playing") return;
+
+  //ちょうちんタイムが制限時間+バッファを超えたら「できなかった」として自動続行
+  if (state.activeEvent) {
+    const elapsed = (Date.now() - state.activeEvent.startedAt) / 1000;
+    if (elapsed >= state.activeEvent.durationSec + EVENT_TIMEOUT_BUFFER_SEC && !eventTimeoutFired) {
+      eventTimeoutFired = true;
+      safeHostAction(() => doEventResult(state.activeEvent.playerId, false));
+    }
+    return;
+  }
+
+  //手番のプレイヤーが一定時間操作しなかったら自動でスタンドさせる
+  const activePid = state.order[state.currentIndex];
+  if (!activePid || !state.turnStartedAt) return;
+  const elapsed = (Date.now() - state.turnStartedAt) / 1000;
+  if (elapsed >= TURN_TIMEOUT_SEC && !turnTimeoutFired) {
+    turnTimeoutFired = true;
+    showHostToast(`⏱ ${playersMap[activePid]?.name || ""} さんが操作しなかったため自動的に勝負します`);
+    safeHostAction(() => doStand(activePid));
+  }
 }
 
 /***********************************************
@@ -511,6 +675,7 @@ async function persistRoomOnly() {
     eventList: state.eventList,
     penaltyList: state.penaltyList,
     activeEvent: state.activeEvent,
+    turnStartedAt: state.turnStartedAt ?? null,
   }, { merge: true });
 }
 
@@ -524,6 +689,9 @@ async function persistPlayer(pid) {
     swapToken: p.swapToken,
     outcome: p.outcome ?? null,
     penaltyText: p.penaltyText ?? null,
+    natural: !!p.natural,
+    curseUsed: !!p.curseUsed,
+    forcedPenalty: !!p.forcedPenalty,
   });
 }
 
@@ -538,9 +706,11 @@ async function persistAll() {
 ************************************************/
 
 let toastHideHandle = null;
-function showHostToast(message) {
+function showHostToast(message, isError, isNatural) {
   const toast = el("effectToast");
   toast.textContent = message;
+  toast.classList.toggle("is-error", !!isError);
+  toast.classList.toggle("is-natural", !!isNatural);
   toast.classList.add("is-visible");
   clearTimeout(toastHideHandle);
   toastHideHandle = setTimeout(() => toast.classList.remove("is-visible"), 3200);
@@ -563,6 +733,7 @@ function renderHost() {
 
   const activePid = state.order[state.currentIndex];
   el("turnLabel").textContent = activePid ? `手番: ${playersMap[activePid].name}` : "ディーラーの番です…";
+  renderTurnTimer(activePid);
 
   el("dealerTotal").textContent = getTotal(state.dealer.cards);
   renderCardRow("dealerCards", state.dealer.cards);
@@ -578,6 +749,7 @@ function renderHost() {
     if (pid === activePid) box.classList.add("hand--active");
 
     const badges = [];
+    if (p.natural) badges.push("🌟");
     if (p.joker) badges.push("🎭");
     if (p.immunity) badges.push("🛡");
     if (p.swapToken) badges.push("🔄");
@@ -605,6 +777,25 @@ function renderCardRow(elId, cardsArr) {
     img.alt = "";
     wrap.appendChild(img);
   });
+}
+
+let turnTimerTickHandle = null;
+function renderTurnTimer(activePid) {
+  const timerEl = el("turnTimerDisplay");
+  if (!timerEl) return;
+  clearInterval(turnTimerTickHandle);
+  if (!activePid || !state.turnStartedAt || state.activeEvent) {
+    timerEl.textContent = "";
+    return;
+  }
+  const tick = () => {
+    const elapsed = Math.floor((Date.now() - state.turnStartedAt) / 1000);
+    const remaining = Math.max(0, TURN_TIMEOUT_SEC - elapsed);
+    timerEl.textContent = `⏱ ${remaining}秒`;
+    timerEl.classList.toggle("is-low", remaining <= 10);
+  };
+  tick();
+  turnTimerTickHandle = setInterval(tick, 1000);
 }
 
 function renderEventBanner() {
@@ -635,16 +826,38 @@ function renderResultScreen() {
 
   const list = el("resultList");
   list.innerHTML = "";
+  let pendingCount = 0;
   state.order.forEach((pid) => {
     const p = playersMap[pid];
+    const needsPenalty = p.outcome === "lose" || p.forcedPenalty;
+    if (needsPenalty && !p.penaltyText) pendingCount++;
+
     const li = document.createElement("li");
     li.className = `result-item ${p.outcome}`;
     const label = p.outcome === "win" ? "勝ち" : p.outcome === "lose" ? "負け" : "引き分け";
-    const penaltyText = p.penaltyText ? ` — ${p.penaltyText}` : (p.outcome === "lose" ? " — みくじ待ち" : "");
+    const naturalBadge = p.natural ? " 🌟" : "";
+    let penaltyText = "";
+    if (needsPenalty) {
+      penaltyText = p.penaltyText ? ` — ${p.penaltyText}` : (p.forcedPenalty && p.outcome !== "lose" ? " — 呪いのみくじ待ち" : " — みくじ待ち");
+    }
     li.innerHTML = `
-      <div class="side"><strong>${p.name}</strong><span>合計 ${getTotal(p.cards)}</span></div>
+      <div class="side"><strong>${p.name}${naturalBadge}</strong><span>合計 ${getTotal(p.cards)}</span></div>
       <div class="side"><span class="outcome">${label}${penaltyText}</span></div>
     `;
     list.appendChild(li);
   });
+
+  const hintEl = el("pendingPenaltyHint");
+  const nextBtn = el("btnNextRound");
+  if (hintEl && nextBtn) {
+    if (pendingCount > 0) {
+      hintEl.textContent = `まだ${pendingCount}人が罰ゲームみくじを引いていません(各自のスマホで引いてもらいましょう)`;
+      hintEl.classList.remove("hidden");
+      hintEl.classList.add("is-warning");
+      nextBtn.disabled = true;
+    } else {
+      hintEl.classList.add("hidden");
+      nextBtn.disabled = false;
+    }
+  }
 }

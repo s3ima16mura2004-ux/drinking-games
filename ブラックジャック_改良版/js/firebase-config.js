@@ -12,12 +12,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 export const firebaseConfig = {
-  apiKey: "ここにAPIキーを入れる",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "000000000000",
-  appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxx",
+  apiKey: "AIzaSyBjFHEtc6KxujygKJKpb4LeQPKuTRz7C9c",
+  authDomain: "enkai-blackjack.firebaseapp.com",
+  projectId: "enkai-blackjack",
+  storageBucket: "enkai-blackjack.firebasestorage.app",
+  messagingSenderId: "244344353587",
+  appId: "1:244344353587:web:35eb6c9e4dee4800314446",
 };
 
 export const app = initializeApp(firebaseConfig);

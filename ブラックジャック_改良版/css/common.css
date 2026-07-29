@@ -188,3 +188,66 @@ label { display: block; font-size: 0.85rem; margin: 0.9rem 0 0.3rem; color: rgba
 button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--gold-soft); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .lantern-glow, .omikuji-box.is-shaking, .screen--active { animation: none; } }
 @media (max-width: 480px) { .panel { padding: 1.2rem; } .card-row img { width: 2.5rem; } .card-row--large img { width: 3rem; } }
+/* ==========================================================
+   追加分:ナチュラル21・ターンタイマー・QR・エラートースト
+   ========================================================== */
+
+/* ナチュラル21の演出トースト */
+.toast.is-natural {
+  border-color: var(--gold-soft);
+  background: radial-gradient(circle at 50% 0%, rgba(236,210,145,0.35), var(--ink) 70%);
+  animation: sparkle-pop 0.5s ease;
+}
+@keyframes sparkle-pop {
+  0% { transform: translateX(-50%) translateY(0) scale(0.9); }
+  40% { transform: translateX(-50%) translateY(0) scale(1.08); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* エラー用トースト */
+.toast.is-error {
+  border-color: var(--red);
+  color: var(--red-soft);
+  background: rgba(184,54,42,0.14);
+}
+
+/* ターンタイマー */
+.turn-timer {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: rgba(243,234,210,0.75);
+  margin-left: 0.6rem;
+}
+.turn-timer.is-low { color: var(--red-soft); font-weight: 700; }
+
+.round-bar-row { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.4rem; }
+.round-bar-right { display: flex; align-items: center; gap: 0.6rem; }
+
+/* ホストの強制進行ボタン */
+.btn--small { padding: 0.4rem 0.9rem; font-size: 0.78rem; }
+
+/* 警告つきヒント */
+.hint.is-warning { color: var(--red-soft); }
+
+/* QRコード表示欄 */
+.qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.qr-wrap canvas, .qr-wrap img {
+  background: var(--cream);
+  padding: 0.6rem;
+  border-radius: 12px;
+}
+.qr-wrap .hint { text-align: center; }
+
+/* 再接続中の表示 */
+.reconnect-banner {
+  text-align: center;
+  padding: 0.6rem;
+  color: var(--gold-soft);
+  font-size: 0.85rem;
+}
