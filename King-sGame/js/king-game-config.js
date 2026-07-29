@@ -35,6 +35,13 @@
             match /history/{entryId} {
               allow read: if request.auth != null;
               allow create: if request.auth != null;
+              allow update: if request.auth != null;
+              allow delete: if request.auth != null;
+            }
+
+            match /customTemplates/{templateId} {
+              allow read: if request.auth != null;
+              allow create: if request.auth != null;
               allow delete: if request.auth != null;
             }
           }

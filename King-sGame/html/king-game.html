@@ -162,14 +162,25 @@
       <h2 class="card-title">👑 王様の命令</h2>
 
       <div class="mode-toggle">
-        <button id="btn-mode-manual" class="mode-toggle-btn is-active" type="button">自分で選ぶ</button>
-        <button id="btn-mode-vote" class="mode-toggle-btn" type="button">みんなで投票する</button>
+        <button id="btn-mode-manual" class="mode-toggle-btn is-active" type="button" aria-pressed="true">自分で選ぶ</button>
+        <button id="btn-mode-vote" class="mode-toggle-btn" type="button" aria-pressed="false">みんなで投票する</button>
       </div>
 
       <div id="manual-template-block">
       <label class="field-label">お題を選ぶ</label>
 
-      <div id="category-chips" class="category-chips"></div>
+      <div id="template-picker-section">
+      <details id="draw-history-panel" class="history-panel" hidden>
+        <summary>これまでの命令から選び直す</summary>
+        <ul id="draw-history-list" class="history-list"></ul>
+      </details>
+
+      <div class="picker-chip-row" role="group" aria-label="お題のカテゴリを選ぶ">
+        <div id="category-chips" class="category-chips"></div>
+        <button id="custom-template-chip" class="category-chip custom-chip" type="button" hidden aria-pressed="false">🌟 この部屋のオリジナル</button>
+      </div>
+
+      <input id="template-search" class="text-input template-search" type="search" placeholder="🔍 キーワードで絞り込む(例: 乾杯)" aria-label="お題をキーワードで絞り込む">
 
       <div class="roulette-controls">
         <button id="btn-roulette-all" class="btn btn-secondary btn-small" type="button">🎲 全部からランダム</button>
@@ -178,6 +189,7 @@
       <p id="roulette-display" class="roulette-display" hidden></p>
 
       <ul id="template-item-list" class="template-item-list"></ul>
+      </div>
 
       <div id="target-select-block" class="target-select-block" hidden>
         <div class="target-select-item">
@@ -195,6 +207,11 @@
 
       <label class="field-label" for="command-text">命令内容(自由に編集できます)</label>
       <textarea id="command-text" class="text-input textarea-input" rows="3" placeholder="例: ①番の人が一発ギャグをする"></textarea>
+
+      <label id="save-as-template-row" class="checkbox-label">
+        <input type="checkbox" id="save-as-template-check">
+        ☆ このお題をこの部屋のオリジナルテンプレートとして保存する
+      </label>
 
       <button id="btn-send-command" class="btn btn-primary">この命令を発表する</button>
     </div>
@@ -225,6 +242,23 @@
         <summary>これまでの命令</summary>
         <ul id="command-history-list" class="history-list"></ul>
       </details>
+    </div>
+  </section>
+
+  <!-- ============ 画面5: 解散前のサマリー ============ -->
+  <section id="screen-summary" class="screen">
+    <div class="card card-center">
+      <p class="eyebrow">今宵の記録</p>
+      <h2 class="card-title">お疲れ様でした🏮</h2>
+      <p class="hint-text">今夜は<strong id="summary-round-count">0</strong>ラウンド遊びました</p>
+
+      <h3 class="summary-subtitle">👑 王様ランキング</h3>
+      <ul id="summary-king-ranking" class="summary-ranking-list"></ul>
+
+      <p id="summary-weak-highlight" class="summary-weak-highlight" hidden></p>
+
+      <button id="btn-confirm-close-room" class="btn btn-primary">解散して終了する</button>
+      <button id="btn-cancel-close-room" class="btn btn-ghost btn-small">キャンセルして戻る</button>
     </div>
   </section>
 

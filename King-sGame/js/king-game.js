@@ -36,11 +36,18 @@ const state = {
   lastRoomStatus: null,
   enteredDrawRound: null,
   appliedResolvedVoteIndex: null,
+  weakHintShownRound: null,
   lastAnnouncedKey: null,
+  lastHistoryDocRef: null,
+  lastWeakVotes: {},
+  recentTemplateIndices: [],
+  historyItems: [],
+  customTemplates: [],
   unsubRoom: null,
   unsubPlayers: null,
   unsubMe: null,
-  unsubHistory: null
+  unsubHistory: null,
+  unsubCustomTemplates: null
 };
 
 /* ---------- DOM ヘルパー ---------- */
@@ -276,13 +283,15 @@ async function generateUniqueRoomCode() {
 async function cleanupExpiredRoom(roomId) {
   try {
     const roomRef = db.collection("rooms").doc(roomId);
-    const [playersSnap, historySnap] = await Promise.all([
+    const [playersSnap, historySnap, customTemplatesSnap] = await Promise.all([
       roomRef.collection("players").get(),
-      roomRef.collection("history").get()
+      roomRef.collection("history").get(),
+      roomRef.collection("customTemplates").get()
     ]);
     const batch = db.batch();
     playersSnap.forEach((doc) => batch.delete(doc.ref));
     historySnap.forEach((doc) => batch.delete(doc.ref));
+    customTemplatesSnap.forEach((doc) => batch.delete(doc.ref));
     batch.delete(roomRef);
     await batch.commit();
   } catch (err) {
@@ -375,6 +384,8 @@ $("btn-create-room").addEventListener("click", async () => {
       playerCount: 0,
       currentCommand: null,
       weakVotes: {},
+      lastWeakVoteCount: 0,
+      kingCounts: {},
       votingOpen: false,
       voteOptions: [],
       votes: {},
@@ -480,6 +491,7 @@ function enterLobby() {
   listenToRoom();
   listenToPlayers();
   listenToHistory();
+  listenToCustomTemplates();
   startPresenceHeartbeat();
 }
 
@@ -570,7 +582,8 @@ $("btn-start-draw").addEventListener("click", async () => {
       kingUid,
       lastKingUid: kingUid,
       playerCount: shuffled.length,
-      currentCommand: null
+      currentCommand: null,
+      [`kingCounts.${kingUid}`]: firebase.firestore.FieldValue.increment(1)
     });
 
     await batch.commit();
@@ -591,26 +604,85 @@ $("btn-copy-link").addEventListener("click", async () => {
   }
 });
 
-$("btn-close-room").addEventListener("click", closeRoom);
-$("btn-close-room-2").addEventListener("click", closeRoom);
+$("btn-close-room").addEventListener("click", showRoomSummaryBeforeClose);
+$("btn-close-room-2").addEventListener("click", showRoomSummaryBeforeClose);
 
-async function closeRoom() {
-  if (!confirm("部屋を解散します。よろしいですか?")) return;
+async function showRoomSummaryBeforeClose() {
+  try {
+    const roomRef = db.collection("rooms").doc(state.roomId);
+    const [roomSnap, playersSnap, historySnap] = await Promise.all([
+      roomRef.get(),
+      roomRef.collection("players").get(),
+      roomRef.collection("history").get()
+    ]);
+    renderRoomSummary(roomSnap.data() || {}, playersSnap, historySnap);
+    showScreen("screen-summary");
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
+}
+
+function renderRoomSummary(room, playersSnap, historySnap) {
+  const nameByUid = {};
+  playersSnap.forEach((doc) => { nameByUid[doc.id] = doc.data().name || "?"; });
+
+  const historyItems = [];
+  historySnap.forEach((doc) => historyItems.push(doc.data()));
+  historyItems.sort((a, b) => (a.round || 0) - (b.round || 0));
+
+  $("summary-round-count").textContent = historyItems.length;
+
+  const kingCounts = room.kingCounts || {};
+  const ranking = Object.entries(kingCounts)
+    .map(([uid, count]) => ({ name: nameByUid[uid] || "(退出済み)", count }))
+    .sort((a, b) => b.count - a.count);
+
+  $("summary-king-ranking").innerHTML = ranking.length
+    ? ranking
+        .map(
+          (r, i) => `<li><span class="summary-rank">${i + 1}位</span>${escapeHtml(r.name)}<span class="summary-rank-count">👑×${r.count}</span></li>`
+        )
+        .join("")
+    : '<li class="hint-text">記録がありません</li>';
+
+  const maxWeak = historyItems.reduce((max, item) => Math.max(max, item.weakCount || 0), 0);
+  const weakHighlightEl = $("summary-weak-highlight");
+  if (maxWeak > 0) {
+    const topItem = historyItems.find((item) => (item.weakCount || 0) === maxWeak);
+    weakHighlightEl.hidden = false;
+    weakHighlightEl.textContent = `😅 一番「弱いかも」と言われた命令(第${topItem.round}幕・${maxWeak}票): ${topItem.command}`;
+  } else {
+    weakHighlightEl.hidden = true;
+  }
+}
+
+$("btn-confirm-close-room").addEventListener("click", async () => {
+  $("btn-confirm-close-room").disabled = true;
   try {
     const roomRef = db.collection("rooms").doc(state.roomId);
     const playersSnap = await roomRef.collection("players").get();
     const historySnap = await roomRef.collection("history").get();
+    const customTemplatesSnap = await roomRef.collection("customTemplates").get();
     const batch = db.batch();
     playersSnap.forEach((doc) => batch.delete(doc.ref));
     historySnap.forEach((doc) => batch.delete(doc.ref));
+    customTemplatesSnap.forEach((doc) => batch.delete(doc.ref));
     batch.delete(roomRef);
     await batch.commit();
   } catch (err) {
     console.error(err);
     showErrorBanner(friendlyErrorMessage(err));
+  } finally {
+    $("btn-confirm-close-room").disabled = false;
   }
   resetToHome();
-}
+});
+
+$("btn-cancel-close-room").addEventListener("click", () => {
+  // 直前にいた状況に応じて自然な画面に戻す(リスナーは解散手続き中も維持したまま)
+  showScreen(state.lastRoomStatus === "command" ? "screen-command" : "screen-lobby");
+});
 
 function resetToHome() {
   cleanupListeners();
@@ -621,7 +693,13 @@ function resetToHome() {
   state.isHost = false;
   state.enteredDrawRound = null;
   state.appliedResolvedVoteIndex = null;
+  state.weakHintShownRound = null;
   state.lastAnnouncedKey = null;
+  state.lastHistoryDocRef = null;
+  state.lastWeakVotes = {};
+  state.recentTemplateIndices = [];
+  state.historyItems = [];
+  state.customTemplates = [];
   hideRoundIndicator();
   showScreen("screen-home");
 }
@@ -686,14 +764,20 @@ function listenToHistory() {
   state.unsubHistory = historyRef.orderBy("round").onSnapshot(
     (snap) => {
       const items = [];
-      snap.forEach((doc) => items.push(doc.data()));
+      snap.forEach((doc) => items.push({ id: doc.id, ...doc.data() }));
       renderHistory(items);
+      // 直近2件のテンプレート由来のお題は、ルーレットの抽選対象から一時的に外す
+      state.recentTemplateIndices = items
+        .slice(-2)
+        .map((item) => item.templateIndex)
+        .filter((v) => v != null);
     },
     (err) => console.error(err)
   );
 }
 
 function renderHistory(items) {
+  state.historyItems = items;
   const html = items
     .map(
       (item) => `<li><span class="history-round-badge">第${item.round}幕</span>${escapeHtml(item.command)}
@@ -705,6 +789,24 @@ function renderHistory(items) {
   $("command-history-list").innerHTML = html;
   $("lobby-history-panel").hidden = items.length === 0;
   $("command-history-panel").hidden = items.length === 0;
+  renderDrawHistoryReuseList();
+}
+
+/* ---------- この部屋だけのオリジナルお題(自由入力から保存されたもの) ---------- */
+function listenToCustomTemplates() {
+  if (state.unsubCustomTemplates) state.unsubCustomTemplates();
+  const ref = db.collection("rooms").doc(state.roomId).collection("customTemplates");
+
+  state.unsubCustomTemplates = ref.orderBy("createdAt").onSnapshot(
+    (snap) => {
+      const items = [];
+      snap.forEach((doc) => items.push({ id: doc.id, ...doc.data() }));
+      state.customTemplates = items;
+      const chip = $("custom-template-chip");
+      if (chip) chip.hidden = items.length === 0;
+    },
+    (err) => console.error(err)
+  );
 }
 
 /* ==========================================================
@@ -727,10 +829,17 @@ function enterDrawScreen(room) {
   stopRoulette();
   state.appliedResolvedVoteIndex = null;
   setKingMode("manual");
-  $("category-chips").querySelectorAll(".category-chip").forEach((b) => b.classList.remove("is-active"));
+  $("template-picker-section").hidden = false;
+  $("category-chips").querySelectorAll(".category-chip").forEach((b) => {
+    b.classList.remove("is-active");
+    b.setAttribute("aria-pressed", "false");
+  });
   $("btn-roulette-category").hidden = true;
   $("roulette-display").hidden = true;
   $("template-item-list").innerHTML = "";
+  $("template-search").value = "";
+  $("save-as-template-row").hidden = false;
+  $("save-as-template-check").checked = false;
   $("target-select-block").hidden = true;
   $("btn-reroll").hidden = true;
   $("command-text").value = "";
@@ -757,6 +866,13 @@ function enterDrawScreen(room) {
 
     if (amKing) {
       setupKingPanel();
+      if (room.lastWeakVoteCount && state.weakHintShownRound !== room.round) {
+        state.weakHintShownRound = room.round;
+        showErrorBanner(
+          `前回は${room.lastWeakVoteCount}人が「ちょっと弱いかも」と感じたようです。今回は一工夫してみましょう。`,
+          true
+        );
+      }
     } else {
       $("draw-thinking-note").hidden = false;
     }
@@ -784,13 +900,17 @@ let selectedCategoryIndex = null;
 
 /* ---------- 命令の決め方: 自分で選ぶ / みんなで投票する ---------- */
 function setKingMode(mode) {
-  $("btn-mode-manual").classList.toggle("is-active", mode === "manual");
-  $("btn-mode-vote").classList.toggle("is-active", mode === "vote");
+  const manualActive = mode === "manual";
+  $("btn-mode-manual").classList.toggle("is-active", manualActive);
+  $("btn-mode-manual").setAttribute("aria-pressed", manualActive ? "true" : "false");
+  $("btn-mode-vote").classList.toggle("is-active", !manualActive);
+  $("btn-mode-vote").setAttribute("aria-pressed", !manualActive ? "true" : "false");
   $("manual-template-block").hidden = mode === "vote";
 }
 
 $("btn-mode-manual").addEventListener("click", async () => {
   setKingMode("manual");
+  $("template-picker-section").hidden = false;
   state.appliedResolvedVoteIndex = null;
   // 投票を進行中にやめる場合は、投票データをクリアする
   try {
@@ -879,7 +999,8 @@ $("btn-close-vote").addEventListener("click", async () => {
 // 投票結果に応じて対象者選択の画面を作る(手動選択時と同じ流れに合流させる)
 function applyResolvedTemplateForKing(tplIdx) {
   $("king-command-panel").hidden = false;
-  $("manual-template-block").hidden = true;
+  setKingMode("manual");
+  $("template-picker-section").hidden = true; // カテゴリ選びのUIだけ隠し、対象者選択は見せる
   const catIdx = categoryIndexOfTemplate(tplIdx);
   if (catIdx !== -1) selectCategory(catIdx);
   selectTemplateByIndex(tplIdx);
@@ -919,7 +1040,7 @@ function renderVotePanel(amKing, voteOptions, votes) {
       const tpl = COMMAND_TEMPLATES_FLAT[tplIdx];
       const label = tpl ? tpl.text.replace("{A}", "◯").replace("{B}", "△") : "";
       const mineClass = myVote === idx ? " is-mine" : "";
-      return `<li><button type="button" class="vote-option-btn${mineClass}" data-idx="${idx}">
+      return `<li><button type="button" class="vote-option-btn${mineClass}" data-idx="${idx}" aria-pressed="${myVote === idx ? "true" : "false"}">
         <span>${escapeHtml(label)}</span><span class="vote-option-count">${counts[idx]}票</span>
       </button></li>`;
     })
@@ -954,6 +1075,45 @@ function setupKingPanel() {
     chipsWrap.dataset.filled = "1";
   }
 
+  const searchInput = $("template-search");
+  if (searchInput.dataset.wired !== "1") {
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim();
+      $("category-chips").querySelectorAll(".category-chip:not(.custom-chip)").forEach((b) => {
+        b.classList.remove("is-active");
+        b.setAttribute("aria-pressed", "false");
+      });
+      $("custom-template-chip").classList.remove("is-active");
+      if (q) {
+        renderTemplateSearchResults(q);
+      } else if (selectedCategoryIndex != null) {
+        renderTemplateItemList(selectedCategoryIndex);
+      } else {
+        $("template-item-list").innerHTML = "";
+      }
+    });
+    searchInput.dataset.wired = "1";
+  }
+
+  const customChip = $("custom-template-chip");
+  if (customChip.dataset.wired !== "1") {
+    customChip.addEventListener("click", () => {
+      selectedCategoryIndex = null;
+      $("template-search").value = "";
+      $("category-chips").querySelectorAll(".category-chip").forEach((b) => {
+        b.classList.remove("is-active");
+        b.setAttribute("aria-pressed", "false");
+      });
+      customChip.classList.add("is-active");
+      customChip.setAttribute("aria-pressed", "true");
+      $("btn-roulette-category").hidden = true;
+      renderCustomTemplateItemList();
+    });
+    customChip.dataset.wired = "1";
+  }
+
+  renderDrawHistoryReuseList();
+
   $("btn-reroll").onclick = () => rerollTargets();
   $("target-a-select").onchange = () => {
     populateTargetSelects(COMMAND_TEMPLATES_FLAT[currentTemplateIndex], { keepA: true });
@@ -966,7 +1126,7 @@ function setupKingPanel() {
 function renderCategoryChips() {
   const wrap = $("category-chips");
   wrap.innerHTML = COMMAND_CATEGORIES
-    .map((cat, i) => `<button type="button" class="category-chip" data-cat="${i}">${escapeHtml(cat.label)}</button>`)
+    .map((cat, i) => `<button type="button" class="category-chip" data-cat="${i}" aria-pressed="false">${escapeHtml(cat.label)}</button>`)
     .join("");
   wrap.querySelectorAll(".category-chip").forEach((btn) => {
     btn.addEventListener("click", () => selectCategory(Number(btn.dataset.cat)));
@@ -975,30 +1135,118 @@ function renderCategoryChips() {
 
 function selectCategory(catIndex) {
   selectedCategoryIndex = catIndex;
+  $("template-search").value = "";
   $("category-chips").querySelectorAll(".category-chip").forEach((btn, i) => {
-    btn.classList.toggle("is-active", i === catIndex);
+    const active = i === catIndex;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
   });
+  const customChip = $("custom-template-chip");
+  customChip.classList.remove("is-active");
+  customChip.setAttribute("aria-pressed", "false");
   $("btn-roulette-category").hidden = false;
   renderTemplateItemList(catIndex);
 }
 
 function renderTemplateItemList(catIndex) {
   const cat = COMMAND_CATEGORIES[catIndex];
+  const indices = cat.items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item));
+  $("template-item-list").innerHTML = buildTemplateItemsHtml(indices);
+  wireTemplateItemButtons();
+}
+
+// キーワード検索(全カテゴリ横断)。マッチした項目にはカテゴリ名のタグを添える
+function renderTemplateSearchResults(query) {
+  const q = query.toLowerCase();
+  const indices = COMMAND_TEMPLATES_FLAT
+    .map((_, idx) => idx)
+    .filter((idx) => COMMAND_TEMPLATES_FLAT[idx].text.replace("{A}", "◯").replace("{B}", "△").toLowerCase().includes(q));
+
   const list = $("template-item-list");
-  list.innerHTML = cat.items
-    .map((item) => {
-      const flatIdx = COMMAND_TEMPLATES_FLAT.indexOf(item);
+  if (!indices.length) {
+    list.innerHTML = '<li class="template-empty-hint">一致するお題が見つかりませんでした</li>';
+    return;
+  }
+  list.innerHTML = buildTemplateItemsHtml(indices, { showCategory: true });
+  wireTemplateItemButtons();
+}
+
+function buildTemplateItemsHtml(indices, opts) {
+  opts = opts || {};
+  return indices
+    .map((flatIdx) => {
+      const item = COMMAND_TEMPLATES_FLAT[flatIdx];
       const label = item.text.replace("{A}", "◯").replace("{B}", "△");
-      const activeClass = currentTemplateIndex === flatIdx ? " is-active" : "";
-      return `<li><button type="button" class="template-item-btn${activeClass}" data-idx="${flatIdx}">${escapeHtml(label)}</button></li>`;
+      const isActive = currentTemplateIndex === flatIdx;
+      let catTag = "";
+      if (opts.showCategory) {
+        const catIdx = categoryIndexOfTemplate(flatIdx);
+        if (catIdx !== -1) catTag = `<span class="template-item-cat">${escapeHtml(COMMAND_CATEGORIES[catIdx].label)}</span>`;
+      }
+      return `<li><button type="button" class="template-item-btn${isActive ? " is-active" : ""}" data-idx="${flatIdx}" aria-pressed="${isActive ? "true" : "false"}">${catTag}${escapeHtml(label)}</button></li>`;
     })
     .join("");
-  list.querySelectorAll(".template-item-btn").forEach((btn) => {
+}
+
+function wireTemplateItemButtons() {
+  $("template-item-list").querySelectorAll(".template-item-btn[data-idx]").forEach((btn) => {
     btn.addEventListener("click", () => selectTemplateByIndex(Number(btn.dataset.idx)));
   });
 }
 
-// お題を確定させる(カテゴリ一覧タップ・ルーレット・投票結果、すべてここに合流する)
+// この部屋だけのオリジナルお題(自由入力から保存されたもの)の一覧
+function renderCustomTemplateItemList() {
+  const list = $("template-item-list");
+  const items = state.customTemplates || [];
+  if (!items.length) {
+    list.innerHTML = '<li class="template-empty-hint">まだこの部屋のオリジナルお題はありません</li>';
+    return;
+  }
+  list.innerHTML = items
+    .map((item) => `<li><button type="button" class="template-item-btn" data-custom-id="${item.id}" aria-pressed="false">${escapeHtml(item.text)}</button></li>`)
+    .join("");
+  list.querySelectorAll(".template-item-btn[data-custom-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      currentTemplateIndex = null;
+      $("target-select-block").hidden = true;
+      $("btn-reroll").hidden = true;
+      $("save-as-template-row").hidden = false;
+      const item = (state.customTemplates || []).find((c) => c.id === btn.dataset.customId);
+      $("command-text").value = item ? item.text : "";
+      list.querySelectorAll(".template-item-btn[data-custom-id]").forEach((b) => {
+        const active = b === btn;
+        b.classList.toggle("is-active", active);
+        b.setAttribute("aria-pressed", active ? "true" : "false");
+      });
+    });
+  });
+}
+
+// ラウンド履歴から「もう一度使う」(テンプレート由来の命令のみ再利用できる)
+function renderDrawHistoryReuseList() {
+  const panel = $("draw-history-panel");
+  const list = $("draw-history-list");
+  if (!panel || !list) return;
+  const items = (state.historyItems || []).filter((item) => item.templateIndex != null);
+  panel.hidden = items.length === 0;
+  list.innerHTML = items
+    .map(
+      (item) => `<li><span class="history-round-badge">第${item.round}幕</span>${escapeHtml(item.command)}
+        <span class="history-king-name">王様: ${escapeHtml(item.kingName || "")}</span>
+        <button type="button" class="btn btn-ghost btn-small history-reuse-btn" data-tpl="${item.templateIndex}">もう一度使う</button></li>`
+    )
+    .join("");
+  list.querySelectorAll(".history-reuse-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.tpl);
+      const catIdx = categoryIndexOfTemplate(idx);
+      if (catIdx !== -1) selectCategory(catIdx);
+      selectTemplateByIndex(idx);
+    });
+  });
+}
+
+// お題を確定させる(カテゴリ一覧タップ・検索・ルーレット・投票結果・履歴再利用、すべてここに合流する)
 function selectTemplateByIndex(idx) {
   currentTemplateIndex = idx;
   const tpl = COMMAND_TEMPLATES_FLAT[idx];
@@ -1013,13 +1261,14 @@ function selectTemplateByIndex(idx) {
 
   $("target-select-block").hidden = false;
   $("btn-reroll").hidden = false;
+  $("save-as-template-row").hidden = true; // 既存テンプレ由来の命令は保存対象外
   renderCommandFromTargets();
 
-  if (selectedCategoryIndex != null) {
-    $("template-item-list").querySelectorAll(".template-item-btn").forEach((btn) => {
-      btn.classList.toggle("is-active", Number(btn.dataset.idx) === idx);
-    });
-  }
+  $("template-item-list").querySelectorAll(".template-item-btn[data-idx]").forEach((btn) => {
+    const active = Number(btn.dataset.idx) === idx;
+    btn.classList.toggle("is-active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function categoryIndexOfTemplate(flatIdx) {
@@ -1037,8 +1286,9 @@ function stopRoulette() {
   }
 }
 
-function runRoulette(pool) {
-  if (!pool || !pool.length) return;
+function runRoulette(displayPool, pickPool) {
+  if (!displayPool || !displayPool.length) return;
+  const finalPool = pickPool && pickPool.length ? pickPool : displayPool;
   stopRoulette();
 
   const display = $("roulette-display");
@@ -1048,7 +1298,7 @@ function runRoulette(pool) {
   $("btn-roulette-category").disabled = true;
 
   const TOTAL_STEPS = 18;
-  const finalIdx = pool[Math.floor(Math.random() * pool.length)];
+  const finalIdx = finalPool[Math.floor(Math.random() * finalPool.length)];
   let step = 0;
 
   function renderStep(idx) {
@@ -1059,7 +1309,7 @@ function runRoulette(pool) {
   function tick() {
     step++;
     const isLast = step >= TOTAL_STEPS;
-    renderStep(isLast ? finalIdx : pool[Math.floor(Math.random() * pool.length)]);
+    renderStep(isLast ? finalIdx : displayPool[Math.floor(Math.random() * displayPool.length)]);
 
     if (!isLast) {
       // だんだん間隔をあけて、スロットが止まる感じを出す
@@ -1083,14 +1333,22 @@ function runRoulette(pool) {
   tick();
 }
 
+// 直近2ラウンドで使ったばかりのお題を候補から除外する(全滅する場合は元のプールにフォールバック)
+function excludingRecentlyUsed(pool) {
+  const recent = state.recentTemplateIndices || [];
+  const filtered = pool.filter((idx) => !recent.includes(idx));
+  return filtered.length ? filtered : pool;
+}
+
 $("btn-roulette-all").addEventListener("click", () => {
-  runRoulette(COMMAND_TEMPLATES_FLAT.map((_, i) => i));
+  const all = COMMAND_TEMPLATES_FLAT.map((_, i) => i);
+  runRoulette(all, excludingRecentlyUsed(all));
 });
 
 $("btn-roulette-category").addEventListener("click", () => {
   if (selectedCategoryIndex == null) return;
   const pool = COMMAND_CATEGORIES[selectedCategoryIndex].items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item));
-  runRoulette(pool);
+  runRoulette(pool, excludingRecentlyUsed(pool));
 });
 
 // 対象①・対象②のプルダウンを、参加人数(王様自身を除く)に合わせて作り直す
@@ -1162,12 +1420,27 @@ $("btn-send-command").addEventListener("click", async () => {
       votes: {},
       voteResolvedIndex: null
     });
-    await roomRef.collection("history").add({
+    state.lastHistoryDocRef = await roomRef.collection("history").add({
       round: state.currentRound,
       kingName: state.myName,
       command: text,
+      templateIndex: currentTemplateIndex,
+      weakCount: 0,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+
+    const saveCheck = $("save-as-template-check");
+    if (saveCheck && saveCheck.checked && currentTemplateIndex == null) {
+      try {
+        await roomRef.collection("customTemplates").add({
+          text,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      } catch (err) {
+        console.error("オリジナルテンプレートの保存に失敗しました", err);
+      }
+      saveCheck.checked = false;
+    }
   } catch (err) {
     console.error(err);
     showErrorBanner(friendlyErrorMessage(err));
@@ -1205,6 +1478,7 @@ function enterCommandScreen(room) {
   $("command-guest-note").hidden = state.isHost;
 
   const weakVotes = room.weakVotes || {};
+  state.lastWeakVotes = weakVotes;
   const weakCount = Object.keys(weakVotes).length;
   $("weak-vote-count").textContent = weakCount > 0 ? `😅「弱いかも」: ${weakCount}人` : "";
   $("btn-weak-vote").hidden = state.isKing;
@@ -1238,6 +1512,16 @@ $("btn-next-round").addEventListener("click", async () => {
   try {
     const roomRef = db.collection("rooms").doc(state.roomId);
     const playersSnap = await roomRef.collection("players").get();
+    const weakCount = Object.keys(state.lastWeakVotes || {}).length;
+
+    if (state.lastHistoryDocRef) {
+      try {
+        await state.lastHistoryDocRef.update({ weakCount });
+      } catch (err) {
+        console.error("履歴への弱票数の記録に失敗しました", err);
+      }
+    }
+
     const batch = db.batch();
     playersSnap.forEach((doc) => batch.update(doc.ref, { number: null }));
     batch.update(roomRef, {
@@ -1246,6 +1530,7 @@ $("btn-next-round").addEventListener("click", async () => {
       currentCommand: null,
       round: firebase.firestore.FieldValue.increment(1),
       weakVotes: {},
+      lastWeakVoteCount: weakCount,
       votingOpen: false,
       voteOptions: [],
       votes: {},
@@ -1266,6 +1551,7 @@ function cleanupListeners() {
   if (state.unsubPlayers) state.unsubPlayers();
   if (state.unsubMe) state.unsubMe();
   if (state.unsubHistory) state.unsubHistory();
+  if (state.unsubCustomTemplates) state.unsubCustomTemplates();
   stopExpiryWatch();
   stopPresenceHeartbeat();
 }
