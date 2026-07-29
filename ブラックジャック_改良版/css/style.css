@@ -30,6 +30,10 @@ body {
   color: var(--cream);
   font-family: var(--font-body);
   padding-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
 }
 
 /* ほんのり灯る提灯の光(控えめな環境演出) */

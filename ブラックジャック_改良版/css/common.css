@@ -30,6 +30,10 @@ body {
   color: var(--cream);
   font-family: var(--font-body);
   padding-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
 }
 
 .lantern-glow {
