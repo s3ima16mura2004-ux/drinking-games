@@ -184,6 +184,7 @@ function loadSavedSettings() {
         // localStorage非対応環境への配慮
     }
     updateNameInputs();
+    applyDifficulty(getRecommendedPairCount(playerCount)); // 【新機能】読み込み時も人数に応じて自動調整
 }
 
 // 連続成功コンボの加算とバナー表示
@@ -263,12 +264,26 @@ function changePlayerCount(amount) {
     if (playerCount > 6) playerCount = 6;
     document.getElementById("playerCountText").innerText = playerCount;
     updateNameInputs();
+    applyDifficulty(getRecommendedPairCount(playerCount)); // 【新機能】人数に応じて枚数を自動調整
 }
 
 function setDifficulty(count, btnElement) {
+    applyDifficulty(count);
+}
+
+// 【新機能】人数に応じたペア数を自動判定
+function getRecommendedPairCount(count) {
+    if (count <= 2) return 4;
+    if (count <= 4) return 6;
+    return 8; // 5人以上
+}
+
+// pairCountとボタンの選択状態をまとめて更新（手動クリック・自動調整の両方から呼ばれる）
+function applyDifficulty(count) {
     pairCount = count;
-    document.querySelectorAll(".diff-btn").forEach(btn => btn.classList.remove("active"));
-    btnElement.classList.add("active");
+    document.querySelectorAll(".diff-btn").forEach(btn => {
+        btn.classList.toggle("active", parseInt(btn.dataset.pairs, 10) === count);
+    });
 }
 
 // 【新機能】1ターンの制限時間を選択

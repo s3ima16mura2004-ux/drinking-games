@@ -464,3 +464,191 @@ body {
     .card-box { padding: 14px; }
     .grid { gap: 5px; margin-bottom: 8px; }
 }
+
+/* ==========================================================================
+   🌐 オンライン対戦モード用スタイル
+   ========================================================================== */
+
+.back-link {
+    display: inline-block;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    padding: 6px 0;
+    margin-bottom: 8px;
+    text-align: left;
+}
+.back-link:active { color: var(--neon-gold); }
+
+/* モード選択ボタン */
+.mode-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 16px 18px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+    touch-action: manipulation;
+    min-height: var(--tap-min);
+}
+.mode-btn:active {
+    border-color: var(--neon-gold);
+    background: rgba(255, 206, 63, 0.08);
+}
+.mode-btn-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    color: var(--neon-gold);
+}
+.mode-btn-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+/* オンライン参加画面のタブ */
+.online-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.online-tab-btn {
+    flex: 1;
+    min-height: var(--tap-min);
+    padding: 10px;
+    background: var(--bg-input);
+    color: var(--text-dim);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+.online-tab-btn.active {
+    background: linear-gradient(135deg, #ff2e7e, #ffce3f);
+    color: #1a0b2e;
+    border-color: var(--neon-gold);
+}
+
+.room-code-input {
+    text-align: center;
+    letter-spacing: 6px;
+    font-size: 20px !important;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+}
+
+.error-text {
+    color: var(--neon-red);
+    font-size: 13px;
+    margin-top: 10px;
+    min-height: 18px;
+    line-height: 1.5;
+}
+
+/* ルームコード表示 */
+.room-code-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+}
+.room-code-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--neon-cyan);
+    font-weight: 700;
+}
+.room-code-value {
+    font-family: var(--font-display);
+    font-size: 34px;
+    letter-spacing: 8px;
+    color: var(--neon-gold);
+    text-shadow: 0 0 12px rgba(255, 206, 63, 0.5);
+}
+.room-code-mini {
+    padding: 8px;
+    margin-bottom: 10px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+}
+.room-code-mini .room-code-value {
+    font-size: 16px;
+    letter-spacing: 4px;
+}
+
+/* 参加者一覧 */
+.setting-group-title {
+    display: block;
+    font-size: 12px;
+    color: var(--neon-cyan);
+    font-weight: 700;
+    text-align: left;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+}
+.player-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.player-list-item {
+    background: var(--bg-input);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.leave-btn {
+    margin-top: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-dim);
+    border: 1px solid var(--border-soft);
+    box-shadow: none;
+}
+
+.host-rescue-btn {
+    display: none;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    min-height: var(--tap-min);
+    background: rgba(255, 77, 94, 0.12);
+    color: var(--neon-red);
+    border: 1px dashed rgba(255, 77, 94, 0.5);
+    border-radius: 10px;
+    font-size: 12.5px;
+    font-family: var(--font-body);
+    cursor: pointer;
+}
+
+/* 自分の手番でない時はカードをタップできないことを視覚的に示す */
+.card.not-my-turn {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
