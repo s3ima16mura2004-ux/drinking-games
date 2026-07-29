@@ -60,7 +60,6 @@ let state = {
   round: 1,
   deck: [],
   discard: [],
-  dealer: { cards: [] },
   order: [],
   currentIndex: 0,
   eventList: DEFAULT_EVENTS,
@@ -152,7 +151,6 @@ async function createRoom() {
     round: 1,
     deck: [],
     discard: [],
-    dealer: { cards: [] },
     order: [],
     currentIndex: 0,
     eventList: DEFAULT_EVENTS,
@@ -197,7 +195,7 @@ function subscribeLobbyPlayers() {
         name: d.data().name,
         joinedAt: d.data().joinedAt,
         cards: [], status: "waiting", joker: false, immunity: false,
-        swapToken: false, outcome: null, penaltyText: null,
+        swapToken: false, rank: null, isLast: false, penaltyText: null,
         natural: false, curseUsed: false, forcedPenalty: false,
       };
     });
@@ -288,14 +286,14 @@ async function startGame() {
 async function beginRound() {
   state.deck = shuffleArray(freshDeck());
   state.discard = [];
-  state.dealer = { cards: [] };
   state.activeEvent = null;
 
   state.order.forEach((pid) => {
     const p = playersMap[pid];
     p.cards = [];
     p.status = "waiting";
-    p.outcome = null;
+    p.rank = null;
+    p.isLast = false;
     p.penaltyText = null;
     p.natural = false;
     p.curseUsed = false;
@@ -303,7 +301,6 @@ async function beginRound() {
     //ジョーカー・御守り・交換チケットはラウンドをまたいで持ち越す
   });
 
-  state.dealer.cards.push(drawCard(), drawCard());
   state.order.forEach((pid) => {
     const p = playersMap[pid];
     p.cards.push(drawCard(), drawCard());
@@ -409,7 +406,7 @@ async function advanceTurn() {
   if (state.currentIndex >= state.order.length) {
     state.turnStartedAt = null;
     await persistAll();
-    await dealerPlay();
+    await computeResults();
   } else {
     const nextPid = state.order[state.currentIndex];
     playersMap[nextPid].status = "active";
@@ -533,54 +530,45 @@ async function doEventResult(playerId, success) {
 }
 
 /***********************************************
-  11.ディーラーのプレイ・結果判定
+  11.結果判定(21に一番近い人が1位、ディーラーなし)
 ************************************************/
 
-async function dealerPlay() {
-  await dealerStep();
-}
-
-async function dealerStep() {
-  if (getTotal(state.dealer.cards) < 17) {
-    state.dealer.cards.push(drawCard());
-    await persistRoomOnly();
-    renderHost();
-    await sleep(700);
-    await dealerStep();
-  } else {
-    await sleep(400);
-    await computeResults();
-  }
-}
-
-async function computeResults() {
-  const dealerTotal = getTotal(state.dealer.cards);
-  const dealerNatural = state.dealer.cards.length === 2 && dealerTotal === 21;
-  state.order.forEach((pid) => {
+//バーストは問答無用で最下位グループ、それ以外は21に近いほど上位
+//同じ合計の人は同順位(例:1位、1位、3位)。sole 1st + ナチュラル21で「呪い」が使える
+function computeResults() {
+  const scored = state.order.map((pid) => {
     const p = playersMap[pid];
-    const myTotal = getTotal(p.cards);
-    let outcome;
-    if (myTotal > 21) outcome = "lose";
-    //ナチュラル21同士は引き分け、片方だけなら自動的にその人の勝ち
-    else if (p.natural && dealerNatural) outcome = "draw";
-    else if (p.natural) outcome = "win";
-    else if (dealerNatural) outcome = "lose";
-    else if (dealerTotal > 21) outcome = "win";
-    else if (myTotal > dealerTotal) outcome = "win";
-    else if (myTotal < dealerTotal) outcome = "lose";
-    else outcome = "draw";
-    p.outcome = outcome;
+    const total = getTotal(p.cards);
+    const busted = total > 21;
+    return { pid, score: busted ? total - 1000 : total };
   });
+
+  scored.forEach((s) => {
+    s.rank = 1 + scored.filter((o) => o.score > s.score).length;
+  });
+  const maxRank = Math.max(...scored.map((s) => s.rank));
+
+  scored.forEach((s) => {
+    const p = playersMap[s.pid];
+    p.rank = s.rank;
+    p.isLast = s.rank === maxRank;
+  });
+
   state.status = "result";
   state.turnStartedAt = null;
   stopTimerWatchdog();
-  await persistAll();
+  return persistAll();
+}
+
+//このラウンドで単独1位のプレイヤーが何人いるか(「呪い」の使用条件に使う)
+function countFirstPlace() {
+  return state.order.filter((pid) => playersMap[pid].rank === 1).length;
 }
 
 async function doPenaltyDraw(playerId) {
   const p = playersMap[playerId];
   if (!p) return;
-  const needsPenalty = p.outcome === "lose" || p.forcedPenalty;
+  const needsPenalty = p.isLast || p.forcedPenalty;
   if (!needsPenalty || p.penaltyText) return; //対象外、またはすでに引いている
   if (p.immunity) {
     p.immunity = false;
@@ -596,7 +584,7 @@ async function doPenaltyDraw(playerId) {
 async function doCurse(casterId, targetId) {
   const caster = playersMap[casterId];
   const target = targetId && playersMap[targetId];
-  if (!caster || !target || !caster.natural || caster.outcome !== "win" || caster.curseUsed) return;
+  if (!caster || !target || !caster.natural || caster.rank !== 1 || countFirstPlace() !== 1 || caster.curseUsed) return;
   if (targetId === casterId) return;
   caster.curseUsed = true;
   target.forcedPenalty = true;
@@ -669,7 +657,6 @@ async function persistRoomOnly() {
     round: state.round,
     deck: state.deck,
     discard: state.discard,
-    dealer: state.dealer,
     order: state.order,
     currentIndex: state.currentIndex,
     eventList: state.eventList,
@@ -687,7 +674,8 @@ async function persistPlayer(pid) {
     joker: p.joker,
     immunity: p.immunity,
     swapToken: p.swapToken,
-    outcome: p.outcome ?? null,
+    rank: p.rank ?? null,
+    isLast: !!p.isLast,
     penaltyText: p.penaltyText ?? null,
     natural: !!p.natural,
     curseUsed: !!p.curseUsed,
@@ -732,11 +720,8 @@ function renderHost() {
   el("roundLabel").textContent = `ラウンド ${state.round}`;
 
   const activePid = state.order[state.currentIndex];
-  el("turnLabel").textContent = activePid ? `手番: ${playersMap[activePid].name}` : "ディーラーの番です…";
+  el("turnLabel").textContent = activePid ? `手番: ${playersMap[activePid].name}` : "";
   renderTurnTimer(activePid);
-
-  el("dealerTotal").textContent = getTotal(state.dealer.cards);
-  renderCardRow("dealerCards", state.dealer.cards);
 
   renderEventBanner();
 
@@ -822,23 +807,28 @@ function renderEventBanner() {
 
 function renderResultScreen() {
   showScreen("screen-result");
-  el("resultDealerTotal").textContent = getTotal(state.dealer.cards);
 
   const list = el("resultList");
   list.innerHTML = "";
   let pendingCount = 0;
-  state.order.forEach((pid) => {
+
+  //順位の良い順(1位から)に並べ替えて表示する
+  const sortedPids = [...state.order].sort((a, b) => playersMap[a].rank - playersMap[b].rank);
+
+  sortedPids.forEach((pid) => {
     const p = playersMap[pid];
-    const needsPenalty = p.outcome === "lose" || p.forcedPenalty;
+    const needsPenalty = p.isLast || p.forcedPenalty;
     if (needsPenalty && !p.penaltyText) pendingCount++;
 
     const li = document.createElement("li");
-    li.className = `result-item ${p.outcome}`;
-    const label = p.outcome === "win" ? "勝ち" : p.outcome === "lose" ? "負け" : "引き分け";
+    //色分けは既存のwin(緑)/lose(赤)/draw(金)スタイルを流用する
+    const styleClass = p.rank === 1 ? "win" : p.isLast ? "lose" : "draw";
+    li.className = `result-item ${styleClass}`;
+    const label = `${p.rank}位${p.status === "bust" ? "(バースト)" : ""}`;
     const naturalBadge = p.natural ? " 🌟" : "";
     let penaltyText = "";
     if (needsPenalty) {
-      penaltyText = p.penaltyText ? ` — ${p.penaltyText}` : (p.forcedPenalty && p.outcome !== "lose" ? " — 呪いのみくじ待ち" : " — みくじ待ち");
+      penaltyText = p.penaltyText ? ` — ${p.penaltyText}` : (p.forcedPenalty && !p.isLast ? " — 呪いのみくじ待ち" : " — みくじ待ち");
     }
     li.innerHTML = `
       <div class="side"><strong>${p.name}${naturalBadge}</strong><span>合計 ${getTotal(p.cards)}</span></div>

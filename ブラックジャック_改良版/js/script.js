@@ -7,9 +7,6 @@ let deck = [];
 //捨て札(シャッフル効果で山に戻す用)
 let discard = [];
 
-//ディーラーの手札
-let dealer = { cards: [] };
-
 //プレイヤー一覧
 //status: 'waiting' | 'active' | 'stand' | 'bust' | 'skip'
 let players = [];
@@ -59,9 +56,6 @@ let eventTimerHandle = null;
 
 //結果画面で今どのプレイヤーの罰ゲームみくじを引いているか
 let penaltyTargetIndex = null;
-
-//そのラウンドの各プレイヤーの勝敗(結果画面を再描画するために保持しておく)
-let currentOutcomes = [];
 
 //呪いの一枚(ナチュラル21ボーナス)で今誰が呪いをかけようとしているか
 let curseCasterIndex = null;
@@ -202,6 +196,8 @@ function makePlayer(name) {
     forcedPenalty: false,   // 呪いをかけられて罰ゲームみくじが確定しているか
     penaltyDrawn: false,    // 罰ゲームみくじをすでに引いたか
     penaltyText: null,
+    rank: null,             // このラウンドの順位(1位が最も21に近い)
+    isLast: false,          // このラウンドの最下位か
   };
 }
 
@@ -216,7 +212,6 @@ function beginRound() {
   deck = shuffleArray(deck);
   discard = [];
 
-  dealer = { cards: [] };
   players.forEach((p) => {
     p.cards = [];
     p.status = "waiting";
@@ -225,11 +220,12 @@ function beginRound() {
     p.forcedPenalty = false;
     p.penaltyDrawn = false;
     p.penaltyText = null;
+    p.rank = null;
+    p.isLast = false;
     //ジョーカー・免罪符・交換チケットはラウンドをまたいで持ち越す
   });
 
   //最初に2枚ずつ配る(効果は発動させない)
-  dealer.cards.push(deck.pop(), deck.pop());
   players.forEach((p) => {
     p.cards.push(deck.pop(), deck.pop());
     p.natural = getTotal(p.cards) === 21;
@@ -335,7 +331,7 @@ function advanceTurn() {
     currentIndex++;
   }
   if (currentIndex >= players.length) {
-    dealerPlay();
+    showResults();
   } else {
     activatePlayer(currentIndex);
   }
@@ -489,59 +485,54 @@ function resolveEvent(success) {
 }
 
 /***********************************************
-  10.ディーラーのプレイ・結果判定
+  10.結果判定(21に一番近い人が1位、ディーラーなし)
 ************************************************/
 
-function dealerPlay() {
-  el("turnLabel").textContent = "ディーラーの番です…";
-  render();
-  dealerDrawStep();
-}
+//バーストは問答無用で最下位グループ、それ以外は21に近いほど上位
+//同じ合計の人は同順位(例:1位、1位、3位)
+function computeRankings() {
+  const scored = players.map((p) => {
+    const total = getTotal(p.cards);
+    const busted = total > 21;
+    return { total, busted, score: busted ? total - 1000 : total };
+  });
 
-function dealerDrawStep() {
-  if (getTotal(dealer.cards) < 17) {
-    dealer.cards.push(drawCard());
-    render();
-    setTimeout(dealerDrawStep, 700);
-  } else {
-    setTimeout(showResults, 500);
-  }
-}
+  scored.forEach((s) => {
+    s.rank = 1 + scored.filter((o) => o.score > s.score).length;
+  });
+  const maxRank = Math.max(...scored.map((s) => s.rank));
+  const firstCount = scored.filter((s) => s.rank === 1).length;
 
-function judgeAgainstDealer(player, dealerHand) {
-  const myTotal = getTotal(player.cards);
-  const dealerTotal = getTotal(dealerHand);
-  const dealerNatural = dealerHand.length === 2 && dealerTotal === 21;
+  players.forEach((p, i) => {
+    p.rank = scored[i].rank;
+    p.isLast = scored[i].rank === maxRank;
+  });
 
-  if (myTotal > 21) return "lose";
-  //ナチュラル21同士は引き分け、片方だけなら自動的にその人の勝ち
-  if (player.natural && dealerNatural) return "draw";
-  if (player.natural) return "win";
-  if (dealerNatural) return "lose";
-  if (dealerTotal > 21) return "win";
-  if (myTotal > dealerTotal) return "win";
-  if (myTotal < dealerTotal) return "lose";
-  return "draw";
+  return { firstCount };
 }
 
 function showResults() {
-  el("resultDealerTotal").textContent = getTotal(dealer.cards);
-  //このラウンドの勝敗を1回だけ計算し、以後は再描画のたびに使い回す
-  currentOutcomes = players.map((p) => judgeAgainstDealer(p, dealer.cards));
-  renderResultList();
+  const { firstCount } = computeRankings();
+  renderResultList(firstCount);
   showScreen("screen-result");
 }
 
-function renderResultList() {
+function renderResultList(firstCount) {
   const list = el("resultList");
   list.innerHTML = "";
 
-  players.forEach((p, i) => {
-    const outcome = currentOutcomes[i];
-    const li = document.createElement("li");
-    li.className = `result-item ${outcome}`;
+  //順位の良い順(1位から)に並べ替えて表示する
+  const order = players
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => a.p.rank - b.p.rank);
 
-    const label = outcome === "win" ? "勝ち" : outcome === "lose" ? "負け" : "引き分け";
+  order.forEach(({ p, i }) => {
+    const li = document.createElement("li");
+    //色分けは既存のwin(緑)/lose(赤)/draw(金)スタイルを流用する
+    const styleClass = p.rank === 1 ? "win" : p.isLast ? "lose" : "draw";
+    li.className = `result-item ${styleClass}`;
+
+    const label = `${p.rank}位${p.status === "bust" ? "(バースト)" : ""}`;
     const side = document.createElement("div");
     side.className = "side";
     side.innerHTML = `<strong>${p.name}</strong><span>合計 ${getTotal(p.cards)}</span>${p.natural ? ' <span class="badge" title="ナチュラル21">🌟</span>' : ""}`;
@@ -554,8 +545,8 @@ function renderResultList() {
     outcomeSpan.textContent = label;
     right.appendChild(outcomeSpan);
 
-    //通常の負け、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
-    const needsPenalty = outcome === "lose" || p.forcedPenalty;
+    //最下位、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
+    const needsPenalty = p.isLast || p.forcedPenalty;
     if (needsPenalty) {
       if (p.penaltyDrawn) {
         const doneSpan = document.createElement("span");
@@ -572,14 +563,14 @@ function renderResultList() {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn btn--red";
-        btn.textContent = outcome === "lose" ? "罰ゲームみくじを引く" : "🌟 呪いの罰ゲームみくじを引く";
+        btn.textContent = p.isLast ? "罰ゲームみくじを引く" : "🌟 呪いの罰ゲームみくじを引く";
         btn.addEventListener("click", () => openPenaltyModal(i));
         right.appendChild(btn);
       }
     }
 
-    //ナチュラル21で勝った人は、まだ呪いを使っていなければ誰かに追加の罰ゲームを押し付けられる
-    if (p.natural && outcome === "win" && !p.curseUsed && players.length > 1) {
+    //ナチュラル21のまま単独1位の人は、まだ呪いを使っていなければ誰かに罰ゲームを押し付けられる
+    if (p.natural && p.rank === 1 && firstCount === 1 && !p.curseUsed && players.length > 1) {
       const curseBtn = document.createElement("button");
       curseBtn.type = "button";
       curseBtn.className = "btn btn--gold btn--small";
@@ -598,9 +589,8 @@ function renderResultList() {
 //全員が罰ゲームみくじを引き終わるまで「次のラウンドへ」を押せないようにする
 function updatePendingPenaltyHint() {
   let pending = 0;
-  players.forEach((p, i) => {
-    const outcome = currentOutcomes[i];
-    const needsPenalty = outcome === "lose" || p.forcedPenalty;
+  players.forEach((p) => {
+    const needsPenalty = p.isLast || p.forcedPenalty;
     if (needsPenalty && !p.penaltyDrawn) pending++;
   });
 
@@ -616,6 +606,7 @@ function updatePendingPenaltyHint() {
     btn.disabled = false;
   }
 }
+
 
 /***********************************************
   11.罰ゲームみくじ
@@ -698,10 +689,6 @@ function applyCurse(casterIndex, targetIndex) {
 ************************************************/
 
 function render() {
-  //ディーラー
-  el("dealerTotal").textContent = getTotal(dealer.cards);
-  renderCardRow("dealerCards", dealer.cards);
-
   //現在の手番プレイヤー
   const p = players[currentIndex];
   if (p) {

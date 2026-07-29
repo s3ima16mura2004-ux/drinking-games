@@ -163,7 +163,7 @@ async function joinRoom() {
       name: myName,
       joinedAt: Date.now(),
       cards: [], status: "waiting", joker: false, immunity: false,
-      swapToken: false, outcome: null, penaltyText: null,
+      swapToken: false, rank: null, isLast: false, penaltyText: null,
       natural: false, curseUsed: false, forcedPenalty: false,
     }, { merge: true });
 
@@ -354,11 +354,8 @@ function render() {
 
   const activePid = roomState.order[roomState.currentIndex];
   const isMyTurn = activePid === myId;
-  el("turnLabel").textContent = isMyTurn ? "あなたの番です!" : (activePid ? `手番: ${playersData[activePid]?.name || ""} さん` : "ディーラーの番です…");
+  el("turnLabel").textContent = isMyTurn ? "あなたの番です!" : (activePid ? `手番: ${playersData[activePid]?.name || ""} さん` : "");
   renderTurnTimer(activePid);
-
-  el("dealerTotal").textContent = getTotal(roomState.dealer.cards);
-  renderCardRow("dealerCards", roomState.dealer.cards);
 
   const me = playersData[myId] || { cards: [], status: "waiting", joker: false, immunity: false, swapToken: false };
   renderCardRow("myCards", me.cards);
@@ -446,20 +443,21 @@ function renderOtherPlayers(activePid) {
 
 function renderResult() {
   showScreen("screen-result");
-  el("resultDealerTotal").textContent = getTotal(roomState.dealer.cards);
 
   const me = playersData[myId];
-  const outcomeLabel = { win: "🎉 あなたの勝ちです!", lose: "😢 あなたの負けです…", draw: "🤝 引き分けです" }[me?.outcome] || "";
   const naturalNote = me?.natural ? " 🌟ナチュラル21!" : "";
-  el("myOutcome").textContent = `${outcomeLabel}${naturalNote}(あなたの合計: ${getTotal(me?.cards)})`;
+  const rankLabel = me?.rank ? `${me.rank}位です` : "";
+  const bustNote = me?.status === "bust" ? "(バースト)" : "";
+  el("myOutcome").textContent = `🎲 あなたは${rankLabel}${bustNote}${naturalNote}(あなたの合計: ${getTotal(me?.cards)})`;
 
-  //ナチュラル21で勝った場合、まだ呪いを使っていなければボーナスを提示する
+  //ナチュラル21のまま単独1位の場合、まだ呪いを使っていなければボーナスを提示する
+  const soleFirst = me?.rank === 1 && Object.values(playersData).filter((p) => p.rank === 1).length === 1;
   const curseArea = el("curseArea");
-  const canCurse = !!(me?.natural && me?.outcome === "win" && !me?.curseUsed && roomState.order.length > 1);
+  const canCurse = !!(me?.natural && soleFirst && !me?.curseUsed && roomState.order.length > 1);
   curseArea.classList.toggle("hidden", !canCurse);
 
-  //通常の負け、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
-  const needsPenalty = !!(me && (me.outcome === "lose" || me.forcedPenalty));
+  //最下位、または「呪い」をかけられた場合に罰ゲームみくじの対象になる
+  const needsPenalty = !!(me && (me.isLast || me.forcedPenalty));
   const penaltyArea = el("penaltyArea");
   if (needsPenalty) {
     penaltyArea.classList.remove("hidden");
@@ -479,7 +477,8 @@ function renderResult() {
 
 function openCurseModal() {
   const me = playersData[myId];
-  if (!me || !me.natural || me.outcome !== "win" || me.curseUsed) return;
+  const soleFirst = me?.rank === 1 && Object.values(playersData).filter((p) => p.rank === 1).length === 1;
+  if (!me || !me.natural || !soleFirst || me.curseUsed) return;
   const wrap = el("curseTargets");
   wrap.innerHTML = "";
   Object.keys(playersData).forEach((pid) => {
