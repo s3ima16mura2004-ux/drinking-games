@@ -40,6 +40,7 @@ function enterCommandScreen(room) {
   $("btn-weak-vote").hidden = state.isKing;
   $("btn-weak-vote").disabled = !!weakVotes[state.uid];
   renderMomentsFeed();
+  renderExemptionBlock(room);
 
   // 同じ命令に対して効果音・読み上げを何度も再生しないように、ラウンド+命令文をキーにする
   const announceKey = `${room.round}|${room.currentCommand || ""}`;
@@ -61,6 +62,56 @@ $("btn-weak-vote").addEventListener("click", async () => {
     console.error(err);
     showErrorBanner(friendlyErrorMessage(err));
     $("btn-weak-vote").disabled = false;
+  }
+});
+
+/* ---------- 🛡️ 免除カード ---------- */
+function renderExemptionBlock(room) {
+  const block = $("exemption-block");
+  const targetNumbers = room.targetNumbers || [];
+  const isTarget = state.myNumber != null && targetNumbers.includes(state.myNumber);
+
+  if (!isTarget) {
+    block.hidden = true;
+    return;
+  }
+
+  const exempted = room.exemptedThisRound || {};
+  const alreadyUsed = !!exempted[state.uid];
+  const me = (state.players || []).find((p) => p.id === state.uid);
+  const remaining = me && typeof me.exemptionCards === "number" ? me.exemptionCards : 0;
+
+  block.hidden = false;
+  if (alreadyUsed) {
+    $("btn-use-exemption").hidden = true;
+    $("exemption-used-note").hidden = false;
+  } else {
+    $("exemption-used-note").hidden = true;
+    $("btn-use-exemption").hidden = remaining <= 0;
+    $("exemption-remaining-count").textContent = remaining;
+  }
+}
+
+$("btn-use-exemption").addEventListener("click", async () => {
+  if (!state.roomId || !state.uid) return;
+  const me = (state.players || []).find((p) => p.id === state.uid);
+  if (!me || !(me.exemptionCards > 0)) return;
+  if (!confirm("免除カードを1枚使って、この命令を免除します。よろしいですか?")) return;
+
+  $("btn-use-exemption").disabled = true;
+  try {
+    const roomRef = db.collection("rooms").doc(state.roomId);
+    await roomRef.collection("players").doc(state.uid).update({
+      exemptionCards: firebase.firestore.FieldValue.increment(-1)
+    });
+    await roomRef.update({
+      [`exemptedThisRound.${state.uid}`]: true
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  } finally {
+    $("btn-use-exemption").disabled = false;
   }
 });
 
@@ -213,6 +264,8 @@ $("btn-next-round").addEventListener("click", async () => {
       status: "waiting",
       kingUid: null,
       currentCommand: null,
+      targetNumbers: [],
+      exemptedThisRound: {},
       round: firebase.firestore.FieldValue.increment(1),
       weakVotes: {},
       lastWeakVoteCount: weakCount,

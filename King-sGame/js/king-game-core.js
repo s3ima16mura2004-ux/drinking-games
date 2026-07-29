@@ -52,6 +52,8 @@ const state = {
   summaryReportText: "",
   bannedKeywords: [],
   localRulesNote: "",
+  excludedCategories: [],
+  notifiedExemptionUids: [],
   unsubRoom: null,
   unsubPlayers: null,
   unsubMe: null,

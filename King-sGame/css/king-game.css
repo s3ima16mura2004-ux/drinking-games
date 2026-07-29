@@ -776,6 +776,36 @@ body {
   font-size: 13px;
 }
 
+.category-exclude-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.category-exclude-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.category-exclude-item input {
+  flex-shrink: 0;
+}
+
+.exemption-block {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.player-exemption-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--gold);
+}
+
 .toast-roulette-body {
   margin-top: 4px;
 }

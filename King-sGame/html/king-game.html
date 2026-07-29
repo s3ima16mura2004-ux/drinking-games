@@ -69,6 +69,13 @@
         <h3>幹事として部屋を作る</h3>
         <label class="field-label" for="host-name">あなたの名前</label>
         <input id="host-name" class="text-input" type="text" placeholder="例: たなか" maxlength="12">
+        <label class="field-label" for="host-exemption-count">免除カード(一人あたり)</label>
+        <select id="host-exemption-count" class="text-input">
+          <option value="3" selected>3枚</option>
+          <option value="4">4枚</option>
+          <option value="5">5枚</option>
+        </select>
+        <p class="hint-text">気が乗らない命令が来た時に、対象者が使うと免除される回数です</p>
         <button id="btn-create-room" class="btn btn-primary">部屋を作る</button>
       </div>
 
@@ -139,10 +146,14 @@
           <div id="ng-word-chips" class="category-chips"></div>
           <input id="ng-word-input" class="text-input" type="text" placeholder="例: イッキ" maxlength="20">
           <button id="btn-add-ng-word" class="btn btn-ghost btn-small" type="button">追加</button>
+
+          <label class="field-label">今回は使わないカテゴリ</label>
+          <div id="category-exclude-checks" class="category-exclude-list"></div>
         </div>
         <div id="local-rules-guest-view" class="local-rules-body">
           <p id="local-rules-note-display" class="hint-text"></p>
           <div id="ng-word-chips-readonly" class="category-chips"></div>
+          <div id="category-exclude-readonly" class="category-chips"></div>
         </div>
       </details>
 
@@ -272,6 +283,11 @@
       <div class="weak-vote-block">
         <button id="btn-weak-vote" class="btn btn-ghost btn-small" hidden>😅 ちょっと弱いかも</button>
         <p id="weak-vote-count" class="hint-text"></p>
+      </div>
+
+      <div id="exemption-block" class="exemption-block" hidden>
+        <button id="btn-use-exemption" class="btn btn-ghost btn-small" type="button">🛡️ 免除カードを使う(残り<span id="exemption-remaining-count">0</span>枚)</button>
+        <p id="exemption-used-note" class="hint-text" hidden>🛡️ この命令は免除カードで免除しました</p>
       </div>
 
       <div id="command-host-controls" class="host-controls" hidden>

@@ -23,6 +23,7 @@ function listenToRoom() {
       state.currentRound = room.round || 1;
       state.bannedKeywords = room.bannedKeywords || [];
       state.localRulesNote = room.localRulesNote || "";
+      state.excludedCategories = room.excludedCategories || [];
       renderLocalRules();
       updateRoundIndicator();
       startExpiryWatch(room);
@@ -32,6 +33,22 @@ function listenToRoom() {
       if (toast && toast.at && state.lastToastAt !== toast.at) {
         state.lastToastAt = toast.at;
         showErrorBanner(`🍻 ${toast.winnerName}さんが「${toast.role}」に選ばれました!`, true);
+      }
+
+      // 🛡️ 免除カードが使われたら、全員に通知する(ラウンドが変わったら通知済みリストをリセット)
+      const exemptedUids = Object.keys(room.exemptedThisRound || {});
+      if (exemptedUids.length === 0) {
+        state.notifiedExemptionUids = [];
+      } else {
+        const newlyExempted = exemptedUids.filter((uid) => !state.notifiedExemptionUids.includes(uid));
+        if (newlyExempted.length) {
+          const names = newlyExempted.map((uid) => {
+            const p = (state.players || []).find((pl) => pl.id === uid);
+            return p ? p.name : "誰か";
+          });
+          showErrorBanner(`🛡️ ${names.join("・")}さんが免除カードを使いました`, true);
+          state.notifiedExemptionUids = exemptedUids;
+        }
       }
 
       // ラウンドの切り替わりを検知して、全員に一瞬の通知を出す

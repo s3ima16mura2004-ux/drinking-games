@@ -56,6 +56,8 @@ $("btn-create-room").addEventListener("click", async () => {
     await ensureSignedIn();
     const roomId = await generateUniqueRoomCode();
 
+    const exemptionCardCount = Math.min(5, Math.max(3, parseInt($("host-exemption-count").value, 10) || 3));
+
     await db.collection("rooms").doc(roomId).set({
       hostUid: state.uid,
       status: "waiting",
@@ -64,6 +66,7 @@ $("btn-create-room").addEventListener("click", async () => {
       round: 1,
       playerCount: 0,
       currentCommand: null,
+      targetNumbers: [],
       weakVotes: {},
       lastWeakVoteCount: 0,
       kingCounts: {},
@@ -73,6 +76,9 @@ $("btn-create-room").addEventListener("click", async () => {
       voteResolvedIndex: null,
       localRulesNote: "",
       bannedKeywords: [],
+      excludedCategories: [],
+      exemptionCardCount,
+      exemptedThisRound: {},
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -80,6 +86,7 @@ $("btn-create-room").addEventListener("click", async () => {
       name,
       number: null,
       lastActiveMs: Date.now(),
+      exemptionCards: exemptionCardCount,
       joinedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -133,10 +140,12 @@ $("btn-join-room").addEventListener("click", async () => {
       return;
     }
 
+    const roomData = roomSnap.data();
     await roomRef.collection("players").doc(state.uid).set({
       name,
       number: null,
       lastActiveMs: Date.now(),
+      exemptionCards: roomData.exemptionCardCount || 3,
       joinedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
 
@@ -218,6 +227,43 @@ function renderLocalRules() {
   readonlyWrap.innerHTML = keywords.length
     ? keywords.map((w) => `<span class="ng-word-chip-readonly">🚫 ${escapeHtml(w)}</span>`).join("")
     : '<span class="hint-text">まだNGワードはありません</span>';
+
+  const excluded = state.excludedCategories || [];
+  const checksWrap = $("category-exclude-checks");
+  if (checksWrap.dataset.filled !== "1") {
+    checksWrap.innerHTML = COMMAND_CATEGORIES
+      .map(
+        (cat) => `<label class="category-exclude-item">
+          <input type="checkbox" data-cat="${escapeHtml(cat.label)}">${escapeHtml(cat.label)}
+        </label>`
+      )
+      .join("");
+    checksWrap.querySelectorAll("input[data-cat]").forEach((cb) => {
+      cb.addEventListener("change", () => toggleExcludedCategory(cb.dataset.cat, cb.checked));
+    });
+    checksWrap.dataset.filled = "1";
+  }
+  checksWrap.querySelectorAll("input[data-cat]").forEach((cb) => {
+    cb.checked = excluded.includes(cb.dataset.cat);
+  });
+
+  const readonlyExcludedWrap = $("category-exclude-readonly");
+  readonlyExcludedWrap.innerHTML = excluded.length
+    ? excluded.map((label) => `<span class="ng-word-chip-readonly">🚫 ${escapeHtml(label)}</span>`).join("")
+    : "";
+}
+
+async function toggleExcludedCategory(label, excludeIt) {
+  try {
+    await db.collection("rooms").doc(state.roomId).update({
+      excludedCategories: excludeIt
+        ? firebase.firestore.FieldValue.arrayUnion(label)
+        : firebase.firestore.FieldValue.arrayRemove(label)
+    });
+  } catch (err) {
+    console.error(err);
+    showErrorBanner(friendlyErrorMessage(err));
+  }
 }
 
 $("btn-save-local-rules-note").addEventListener("click", async () => {
@@ -298,7 +344,9 @@ function listenToPlayers() {
         .map((p) => {
           const isOnline = typeof p.lastActiveMs === "number"
             && (Date.now() - p.lastActiveMs) < PRESENCE_ONLINE_THRESHOLD_MS;
-          return `<li><span class="presence-dot${isOnline ? " is-online" : ""}"></span>${escapeHtml(p.name)}</li>`;
+          const cardCount = typeof p.exemptionCards === "number" ? p.exemptionCards : null;
+          const badge = cardCount != null ? `<span class="player-exemption-badge">🛡️×${cardCount}</span>` : "";
+          return `<li><span class="presence-dot${isOnline ? " is-online" : ""}"></span>${escapeHtml(p.name)}${badge}</li>`;
         })
         .join("");
 
@@ -631,6 +679,8 @@ function resetToHome() {
   state.pendingMomentPhoto = null;
   state.bannedKeywords = [];
   state.localRulesNote = "";
+  state.excludedCategories = [];
+  state.notifiedExemptionUids = [];
   hideRoundIndicator();
   showScreen("screen-home");
 }

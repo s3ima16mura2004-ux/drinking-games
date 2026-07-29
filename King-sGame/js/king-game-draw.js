@@ -128,9 +128,14 @@ $("btn-mode-vote").addEventListener("click", () => {
 
 async function startVoting() {
   if (!state.roomId) return;
+  const excludedCats = state.excludedCategories || [];
   const allowedIndices = COMMAND_TEMPLATES_FLAT
     .map((_, i) => i)
-    .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text));
+    .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text))
+    .filter((idx) => {
+      const catIdx = categoryIndexOfTemplate(idx);
+      return catIdx === -1 || !excludedCats.includes(COMMAND_CATEGORIES[catIdx].label);
+    });
   const pool = allowedIndices.length ? allowedIndices : COMMAND_TEMPLATES_FLAT.map((_, i) => i);
   const count = Math.min(3, pool.length);
   const indices = shuffle(pool).slice(0, count);
@@ -284,11 +289,7 @@ function setupKingPanel() {
     localStorage.setItem("kg_seenKingHelp", "1");
   }
 
-  const chipsWrap = $("category-chips");
-  if (chipsWrap.dataset.filled !== "1") {
-    renderCategoryChips();
-    chipsWrap.dataset.filled = "1";
-  }
+  renderCategoryChips();
 
   const searchInput = $("template-search");
   if (searchInput.dataset.wired !== "1") {
@@ -340,8 +341,11 @@ function setupKingPanel() {
 /* ---------- お題選択: カテゴリチップ → タップ式の一覧 ---------- */
 function renderCategoryChips() {
   const wrap = $("category-chips");
+  const excluded = state.excludedCategories || [];
   wrap.innerHTML = COMMAND_CATEGORIES
-    .map((cat, i) => `<button type="button" class="category-chip" data-cat="${i}" aria-pressed="false">${escapeHtml(cat.label)}</button>`)
+    .map((cat, i) => ({ cat, i }))
+    .filter(({ cat }) => !excluded.includes(cat.label))
+    .map(({ cat, i }) => `<button type="button" class="category-chip" data-cat="${i}" aria-pressed="false">${escapeHtml(cat.label)}</button>`)
     .join("");
   wrap.querySelectorAll(".category-chip").forEach((btn) => {
     btn.addEventListener("click", () => selectCategory(Number(btn.dataset.cat)));
@@ -387,9 +391,14 @@ function renderTemplateItemList(catIndex) {
 // キーワード検索(全カテゴリ横断)。マッチした項目にはカテゴリ名のタグを添える
 function renderTemplateSearchResults(query) {
   const q = query.toLowerCase();
+  const excludedCats = state.excludedCategories || [];
   const indices = COMMAND_TEMPLATES_FLAT
     .map((_, idx) => idx)
     .filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text))
+    .filter((idx) => {
+      const catIdx = categoryIndexOfTemplate(idx);
+      return catIdx === -1 || !excludedCats.includes(COMMAND_CATEGORIES[catIdx].label);
+    })
     .filter((idx) => COMMAND_TEMPLATES_FLAT[idx].text.replace("{A}", "◯").replace("{B}", "△").toLowerCase().includes(q));
 
   const list = $("template-item-list");
@@ -572,7 +581,12 @@ function excludingRecentlyUsed(pool) {
 
 // NGワードに一致するお題をプールから除外する(全滅する場合は元のプールにフォールバック)
 function excludingNgWords(pool) {
-  const filtered = pool.filter((idx) => !isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text));
+  const excludedCats = state.excludedCategories || [];
+  const filtered = pool.filter((idx) => {
+    if (isTextNgFiltered(COMMAND_TEMPLATES_FLAT[idx].text)) return false;
+    const catIdx = categoryIndexOfTemplate(idx);
+    return catIdx === -1 || !excludedCats.includes(COMMAND_CATEGORIES[catIdx].label);
+  });
   return filtered.length ? filtered : pool;
 }
 
@@ -649,9 +663,24 @@ $("btn-send-command").addEventListener("click", async () => {
 
   try {
     const roomRef = db.collection("rooms").doc(state.roomId);
+
+    // テンプレート由来の場合のみ、対象者番号がわかるので免除カードの対象判定に使う
+    const targetNumbers = [];
+    if (currentTemplateIndex != null) {
+      const tpl = COMMAND_TEMPLATES_FLAT[currentTemplateIndex];
+      const a = parseInt($("target-a-select").value, 10);
+      if (!isNaN(a)) targetNumbers.push(a);
+      if (tpl.slots === 2) {
+        const b = parseInt($("target-b-select").value, 10);
+        if (!isNaN(b)) targetNumbers.push(b);
+      }
+    }
+
     await roomRef.update({
       status: "command",
       currentCommand: text,
+      targetNumbers,
+      exemptedThisRound: {},
       weakVotes: {},
       votingOpen: false,
       voteOptions: [],
