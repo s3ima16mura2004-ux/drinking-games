@@ -723,9 +723,14 @@ function enterDrawScreen(room) {
   $("vote-panel").hidden = true;
 
   currentTemplateIndex = null;
+  selectedCategoryIndex = null;
+  stopRoulette();
   state.appliedResolvedVoteIndex = null;
   setKingMode("manual");
-  $("template-select").value = "";
+  $("category-chips").querySelectorAll(".category-chip").forEach((b) => b.classList.remove("is-active"));
+  $("btn-roulette-category").hidden = true;
+  $("roulette-display").hidden = true;
+  $("template-item-list").innerHTML = "";
   $("target-select-block").hidden = true;
   $("btn-reroll").hidden = true;
   $("command-text").value = "";
@@ -775,6 +780,7 @@ function enterDrawScreen(room) {
 }
 
 let currentTemplateIndex = null;
+let selectedCategoryIndex = null;
 
 /* ---------- 命令の決め方: 自分で選ぶ / みんなで投票する ---------- */
 function setKingMode(mode) {
@@ -874,21 +880,9 @@ $("btn-close-vote").addEventListener("click", async () => {
 function applyResolvedTemplateForKing(tplIdx) {
   $("king-command-panel").hidden = false;
   $("manual-template-block").hidden = true;
-  const select = $("template-select");
-  if (select.dataset.filled === "1") select.value = String(tplIdx);
-  currentTemplateIndex = tplIdx;
-  const tpl = COMMAND_TEMPLATES_FLAT[tplIdx];
-  const nums = pickUniqueNumbers(tpl.slots, state.playerCount || 3, state.myNumber);
-
-  populateTargetSelects(tpl);
-  $("target-a-select").value = nums[0];
-  if (tpl.slots === 2) {
-    populateTargetSelects(tpl, { keepA: true });
-    $("target-b-select").value = nums[1];
-  }
-  $("target-select-block").hidden = false;
-  $("btn-reroll").hidden = false;
-  renderCommandFromTargets();
+  const catIdx = categoryIndexOfTemplate(tplIdx);
+  if (catIdx !== -1) selectCategory(catIdx);
+  selectTemplateByIndex(tplIdx);
   showErrorBanner("投票で命令テーマが決まりました。対象者を確認して発表してください。", true);
 }
 
@@ -954,24 +948,12 @@ async function castVote(idx) {
 function setupKingPanel() {
   $("king-command-panel").hidden = false;
 
-  const select = $("template-select");
-  if (select.dataset.filled !== "1") {
-    COMMAND_CATEGORIES.forEach((cat) => {
-      const group = document.createElement("optgroup");
-      group.label = cat.label;
-      cat.items.forEach((item) => {
-        const flatIndex = COMMAND_TEMPLATES_FLAT.indexOf(item);
-        const opt = document.createElement("option");
-        opt.value = flatIndex;
-        opt.textContent = item.text.replace("{A}", "◯").replace("{B}", "△");
-        group.appendChild(opt);
-      });
-      select.appendChild(group);
-    });
-    select.dataset.filled = "1";
+  const chipsWrap = $("category-chips");
+  if (chipsWrap.dataset.filled !== "1") {
+    renderCategoryChips();
+    chipsWrap.dataset.filled = "1";
   }
 
-  select.onchange = () => applyTemplate();
   $("btn-reroll").onclick = () => rerollTargets();
   $("target-a-select").onchange = () => {
     populateTargetSelects(COMMAND_TEMPLATES_FLAT[currentTemplateIndex], { keepA: true });
@@ -979,6 +961,137 @@ function setupKingPanel() {
   };
   $("target-b-select").onchange = () => renderCommandFromTargets();
 }
+
+/* ---------- お題選択: カテゴリチップ → タップ式の一覧 ---------- */
+function renderCategoryChips() {
+  const wrap = $("category-chips");
+  wrap.innerHTML = COMMAND_CATEGORIES
+    .map((cat, i) => `<button type="button" class="category-chip" data-cat="${i}">${escapeHtml(cat.label)}</button>`)
+    .join("");
+  wrap.querySelectorAll(".category-chip").forEach((btn) => {
+    btn.addEventListener("click", () => selectCategory(Number(btn.dataset.cat)));
+  });
+}
+
+function selectCategory(catIndex) {
+  selectedCategoryIndex = catIndex;
+  $("category-chips").querySelectorAll(".category-chip").forEach((btn, i) => {
+    btn.classList.toggle("is-active", i === catIndex);
+  });
+  $("btn-roulette-category").hidden = false;
+  renderTemplateItemList(catIndex);
+}
+
+function renderTemplateItemList(catIndex) {
+  const cat = COMMAND_CATEGORIES[catIndex];
+  const list = $("template-item-list");
+  list.innerHTML = cat.items
+    .map((item) => {
+      const flatIdx = COMMAND_TEMPLATES_FLAT.indexOf(item);
+      const label = item.text.replace("{A}", "◯").replace("{B}", "△");
+      const activeClass = currentTemplateIndex === flatIdx ? " is-active" : "";
+      return `<li><button type="button" class="template-item-btn${activeClass}" data-idx="${flatIdx}">${escapeHtml(label)}</button></li>`;
+    })
+    .join("");
+  list.querySelectorAll(".template-item-btn").forEach((btn) => {
+    btn.addEventListener("click", () => selectTemplateByIndex(Number(btn.dataset.idx)));
+  });
+}
+
+// お題を確定させる(カテゴリ一覧タップ・ルーレット・投票結果、すべてここに合流する)
+function selectTemplateByIndex(idx) {
+  currentTemplateIndex = idx;
+  const tpl = COMMAND_TEMPLATES_FLAT[idx];
+  const nums = pickUniqueNumbers(tpl.slots, state.playerCount || 3, state.myNumber);
+
+  populateTargetSelects(tpl);
+  $("target-a-select").value = nums[0];
+  if (tpl.slots === 2) {
+    populateTargetSelects(tpl, { keepA: true });
+    $("target-b-select").value = nums[1];
+  }
+
+  $("target-select-block").hidden = false;
+  $("btn-reroll").hidden = false;
+  renderCommandFromTargets();
+
+  if (selectedCategoryIndex != null) {
+    $("template-item-list").querySelectorAll(".template-item-btn").forEach((btn) => {
+      btn.classList.toggle("is-active", Number(btn.dataset.idx) === idx);
+    });
+  }
+}
+
+function categoryIndexOfTemplate(flatIdx) {
+  const item = COMMAND_TEMPLATES_FLAT[flatIdx];
+  return COMMAND_CATEGORIES.findIndex((cat) => cat.items.includes(item));
+}
+
+/* ---------- ルーレット(スロット風のランダム選択) ---------- */
+let rouletteTimer = null;
+
+function stopRoulette() {
+  if (rouletteTimer) {
+    clearTimeout(rouletteTimer);
+    rouletteTimer = null;
+  }
+}
+
+function runRoulette(pool) {
+  if (!pool || !pool.length) return;
+  stopRoulette();
+
+  const display = $("roulette-display");
+  display.hidden = false;
+  display.classList.remove("is-landing");
+  $("btn-roulette-all").disabled = true;
+  $("btn-roulette-category").disabled = true;
+
+  const TOTAL_STEPS = 18;
+  const finalIdx = pool[Math.floor(Math.random() * pool.length)];
+  let step = 0;
+
+  function renderStep(idx) {
+    const tpl = COMMAND_TEMPLATES_FLAT[idx];
+    display.textContent = `🎲 ${tpl.text.replace("{A}", "◯").replace("{B}", "△")}`;
+  }
+
+  function tick() {
+    step++;
+    const isLast = step >= TOTAL_STEPS;
+    renderStep(isLast ? finalIdx : pool[Math.floor(Math.random() * pool.length)]);
+
+    if (!isLast) {
+      // だんだん間隔をあけて、スロットが止まる感じを出す
+      const delay = 40 + Math.round(Math.pow(step / TOTAL_STEPS, 2) * 260);
+      rouletteTimer = setTimeout(tick, delay);
+      return;
+    }
+
+    display.classList.add("is-landing");
+    $("btn-roulette-all").disabled = false;
+    $("btn-roulette-category").disabled = false;
+    playCommandRevealEffect();
+
+    const catIdx = categoryIndexOfTemplate(finalIdx);
+    if (catIdx !== -1) selectCategory(catIdx);
+    selectTemplateByIndex(finalIdx);
+
+    setTimeout(() => { display.hidden = true; }, 1400);
+  }
+
+  tick();
+}
+
+$("btn-roulette-all").addEventListener("click", () => {
+  runRoulette(COMMAND_TEMPLATES_FLAT.map((_, i) => i));
+});
+
+$("btn-roulette-category").addEventListener("click", () => {
+  if (selectedCategoryIndex == null) return;
+  const pool = COMMAND_CATEGORIES[selectedCategoryIndex].items.map((item) => COMMAND_TEMPLATES_FLAT.indexOf(item));
+  runRoulette(pool);
+});
 
 // 対象①・対象②のプルダウンを、参加人数(王様自身を除く)に合わせて作り直す
 function populateTargetSelects(tpl, opts) {
@@ -1016,30 +1129,6 @@ function renderCommandFromTargets() {
   let text = tpl.text.replace("{A}", a);
   if (tpl.slots === 2) text = text.replace("{B}", b);
   $("command-text").value = text;
-}
-
-function applyTemplate() {
-  const select = $("template-select");
-  if (select.value === "") {
-    $("btn-reroll").hidden = true;
-    $("target-select-block").hidden = true;
-    currentTemplateIndex = null;
-    return;
-  }
-  currentTemplateIndex = Number(select.value);
-  const tpl = COMMAND_TEMPLATES_FLAT[currentTemplateIndex];
-  const nums = pickUniqueNumbers(tpl.slots, state.playerCount || 3, state.myNumber);
-
-  populateTargetSelects(tpl);
-  $("target-a-select").value = nums[0];
-  if (tpl.slots === 2) {
-    populateTargetSelects(tpl, { keepA: true });
-    $("target-b-select").value = nums[1];
-  }
-
-  $("target-select-block").hidden = false;
-  $("btn-reroll").hidden = false;
-  renderCommandFromTargets();
 }
 
 function rerollTargets() {

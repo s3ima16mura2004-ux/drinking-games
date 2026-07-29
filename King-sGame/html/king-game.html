@@ -167,10 +167,17 @@
       </div>
 
       <div id="manual-template-block">
-      <label class="field-label" for="template-select">お題テンプレート</label>
-      <select id="template-select" class="text-input">
-        <option value="">-- 選ぶ --</option>
-      </select>
+      <label class="field-label">お題を選ぶ</label>
+
+      <div id="category-chips" class="category-chips"></div>
+
+      <div class="roulette-controls">
+        <button id="btn-roulette-all" class="btn btn-secondary btn-small" type="button">🎲 全部からランダム</button>
+        <button id="btn-roulette-category" class="btn btn-ghost btn-small" type="button" hidden>🎲 このカテゴリから</button>
+      </div>
+      <p id="roulette-display" class="roulette-display" hidden></p>
+
+      <ul id="template-item-list" class="template-item-list"></ul>
 
       <div id="target-select-block" class="target-select-block" hidden>
         <div class="target-select-item">
