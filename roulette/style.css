@@ -7,14 +7,18 @@ html {
 }
 
 body {
-    font-family: sans-serif;
+    font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
     text-align: center;
-    background: #090f24;
-    color: #fff;
+    color: #f2efe9;
     margin: 0;
     min-height: 100vh;
     -webkit-user-select: none;
     user-select: none;
+    background-color: #0b0b10;
+    background-image:
+        radial-gradient(circle at 15% 8%, rgba(212, 175, 55, 0.10), transparent 42%),
+        radial-gradient(circle at 88% 92%, rgba(212, 175, 55, 0.07), transparent 46%);
+    background-attachment: fixed;
 }
 
 .app-content {
@@ -41,40 +45,58 @@ body {
 .menu-link {
     display: inline-block;
     margin-bottom: 15px;
-    color: #d4af37;
+    color: #e3cf94;
     text-decoration: none;
-    background: #1c2541;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(10px);
     padding: 10px 18px;
-    border-radius: 6px;
-    font-size: 15px;
-    border: 1px solid #d4af37;
+    border-radius: 8px;
+    font-size: 14px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    letter-spacing: 0.5px;
 }
-.subtitle { font-size: 15px; color: #d4af37; letter-spacing: 2px; margin-bottom: 6px; }
+.subtitle {
+    font-family: "Shippori Mincho", serif;
+    font-size: 14px;
+    color: #c9a86a;
+    letter-spacing: 4px;
+    margin-bottom: 6px;
+}
 h1 {
-    font-size: clamp(22px, 7vw, 30px);
-    color: #fff;
+    font-family: "Shippori Mincho", serif;
+    font-weight: 600;
+    font-size: clamp(24px, 7vw, 32px);
+    color: #f2efe9;
     margin-top: 0;
-    margin-bottom: 22px;
-    text-shadow: 0 0 14px rgba(249, 212, 35, 0.35);
+    margin-bottom: 24px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.25);
 }
 
 .card-box {
-    background: #1c2541;
+    background: rgba(255, 255, 255, 0.045);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
     max-width: 460px;
     margin: 0 auto;
-    padding: 28px 22px;
-    border-radius: 18px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(212,175,55,0.08);
-    border: 1px solid #3a506b;
+    padding: 30px 24px;
+    border-radius: 22px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     width: 100%;
     box-sizing: border-box;
+}
+.card-box h2 {
+    font-family: "Shippori Mincho", serif;
+    font-weight: 600;
+    letter-spacing: 1px;
 }
 
 .settings-link {
     display: inline-block;
     background: none;
     border: none;
-    color: #aaa;
+    color: #9a9488;
     font-size: 13px;
     text-decoration: underline;
     margin-bottom: 10px;
@@ -82,7 +104,7 @@ h1 {
     padding: 8px 0;
     touch-action: manipulation;
 }
-.settings-link:active { color: #f9d423; }
+.settings-link:active { color: #e3cf94; }
 
 .player-count-control {
     display: flex;
@@ -92,17 +114,23 @@ h1 {
     margin-bottom: 12px;
 }
 .count-btn {
-    width: 56px;
-    height: 56px;
-    font-size: 26px;
-    background: #3a506b;
-    color: #fff;
-    border: none;
+    width: 54px;
+    height: 54px;
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #f2efe9;
     border-radius: 50%;
     cursor: pointer;
     touch-action: manipulation;
+    transition: 0.2s;
 }
-.count-btn:active { background: #f9d423; color: #111; transform: scale(0.95); }
+.count-btn:active {
+    background: rgba(212, 175, 55, 0.18);
+    border-color: rgba(212, 175, 55, 0.6);
+    color: #f0dca0;
+    transform: scale(0.95);
+}
 
 .name-inputs {
     display: flex;
@@ -111,43 +139,60 @@ h1 {
     margin-bottom: 26px;
 }
 .name-input {
-    background: #0b132b;
-    border: 1px solid #3a506b;
-    color: #fff;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f2efe9;
     padding: 14px 15px;
-    border-radius: 8px;
-    font-size: 17px;
+    border-radius: 10px;
+    font-size: 16px;
     text-align: center;
     width: 100%;
     box-sizing: border-box;
     -webkit-user-select: text;
     user-select: text;
 }
+.name-input::placeholder { color: #6f6a60; }
 
+/* 主要アクションボタン：控えめなシャンパンゴールドのグラデーション */
 .action-btn {
-    font-size: 21px;
+    font-family: "Shippori Mincho", serif;
+    font-size: 19px;
+    font-weight: 600;
     padding: 20px 30px;
-    background: linear-gradient(135deg, #e65c00, #f9d423);
-    color: #111;
-    font-weight: bold;
+    background: linear-gradient(135deg, #b8923f, #ecd99c 55%, #b8923f);
+    color: #1a1608;
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     cursor: pointer;
-    box-shadow: 0 4px 18px rgba(249, 212, 35, 0.45);
+    box-shadow: 0 10px 30px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
     transition: 0.15s;
     width: 100%;
     min-height: 64px;
     touch-action: manipulation;
-    letter-spacing: 1px;
+    letter-spacing: 3px;
 }
-.action-btn:active { transform: scale(0.97); box-shadow: 0 2px 8px rgba(249, 212, 35, 0.3); }
-.action-btn:disabled { background: #444; color: #777; cursor: not-allowed; box-shadow: none; transform: none; }
+.action-btn:active { transform: scale(0.97); box-shadow: 0 4px 14px rgba(212, 175, 55, 0.2); }
+.action-btn:disabled {
+    background: rgba(255, 255, 255, 0.06);
+    color: #6f6a60;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+/* もう一度遊ぶボタンは、控えめなエメラルドグラスで差別化 */
+#restartBtn {
+    background: rgba(72, 187, 120, 0.16);
+    color: #bdeccb;
+    border: 1px solid rgba(72, 187, 120, 0.45);
+    box-shadow: 0 10px 24px rgba(72, 187, 120, 0.12);
+}
 
 @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 4px 18px rgba(249, 212, 35, 0.45); }
-    50% { box-shadow: 0 4px 30px rgba(249, 212, 35, 0.85); }
+    0%, 100% { box-shadow: 0 10px 30px rgba(212, 175, 55, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+    50% { box-shadow: 0 10px 42px rgba(212, 175, 55, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
 }
-.pulse-btn { animation: pulseGlow 1.6s ease-in-out infinite; }
+.pulse-btn { animation: pulseGlow 1.8s ease-in-out infinite; }
 .pulse-btn:active { animation: none; }
 
 .bottom-bar {
@@ -155,11 +200,12 @@ h1 {
     left: 0;
     right: 0;
     bottom: 0;
-    background: #0b132bee;
-    backdrop-filter: blur(6px);
+    background: rgba(11, 11, 16, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-    box-shadow: 0 -6px 20px rgba(0,0,0,0.6);
-    border-top: 1px solid #3a506b;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+    border-top: 1px solid rgba(212, 175, 55, 0.18);
     z-index: 100;
     max-width: 460px;
     margin: 0 auto;
@@ -170,11 +216,13 @@ h1 {
 }
 
 .turn-indicator {
-    font-size: 21px;
-    color: #f9d423;
+    font-family: "Shippori Mincho", serif;
+    font-size: 20px;
+    color: #e3cf94;
     margin-bottom: 15px;
-    font-weight: bold;
-    text-shadow: 0 0 10px rgba(249, 212, 35, 0.4);
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.3);
 }
 
 /* ===== 弾倉のSVGビジュアル ===== */
@@ -194,25 +242,25 @@ h1 {
     transition: transform 1.5s cubic-bezier(0.17, 0.67, 0.24, 1);
 }
 .cylinder-body {
-    fill: #14203d;
-    stroke: #3a506b;
-    stroke-width: 3;
-    filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+    fill: rgba(255, 255, 255, 0.03);
+    stroke: rgba(212, 175, 55, 0.35);
+    stroke-width: 2;
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.5));
 }
 .chamber {
-    stroke-width: 2;
+    stroke-width: 1.5;
     transition: fill 0.3s, stroke 0.3s, opacity 0.3s;
 }
-.chamber-pending { fill: #0b132b; stroke: #55658a; }
-.chamber-safe { fill: #1c2541; stroke: #2ecc71; opacity: 0.55; }
+.chamber-pending { fill: rgba(255, 255, 255, 0.03); stroke: rgba(255, 255, 255, 0.22); }
+.chamber-safe { fill: rgba(72, 187, 120, 0.14); stroke: rgba(72, 187, 120, 0.5); }
 .chamber-hit {
-    fill: #ff3b3b;
-    stroke: #ffdd55;
-    filter: drop-shadow(0 0 10px rgba(255, 59, 59, 0.9));
+    fill: rgba(176, 46, 46, 0.9);
+    stroke: #e8cd82;
+    filter: drop-shadow(0 0 10px rgba(176, 46, 46, 0.85));
 }
 .cylinder-pointer {
-    fill: #f9d423;
-    filter: drop-shadow(0 0 6px rgba(249, 212, 35, 0.6));
+    fill: #e8cd82;
+    filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.5));
 }
 .cylinder-wrap .status {
     position: absolute;
@@ -233,12 +281,12 @@ h1 {
 }
 
 #message {
-    font-size: 19px;
+    font-size: 17px;
     margin-top: 20px;
-    font-weight: bold;
-    color: #fff;
+    font-weight: 500;
+    color: #ded9cf;
     min-height: 44px;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
 @keyframes countPulse {
@@ -248,14 +296,15 @@ h1 {
 }
 .count-pulse {
     animation: countPulse 0.5s ease-out;
-    color: #f9d423;
+    color: #e8cd82;
     font-weight: bold;
 }
 
+/* iPhoneは振動非対応なので、画面フラッシュで体感を補完する（控えめな深紅に調整） */
 .hit-flash {
     position: fixed;
     inset: 0;
-    background: #ff2d2d;
+    background: #8c2b2b;
     opacity: 0;
     pointer-events: none;
     z-index: 300;
@@ -264,7 +313,7 @@ h1 {
     animation: flashPulse 0.5s ease-out;
 }
 @keyframes flashPulse {
-    0% { opacity: 0.7; }
+    0% { opacity: 0.55; }
     100% { opacity: 0; }
 }
 
@@ -273,28 +322,33 @@ h1 {
     margin-bottom: 24px;
 }
 .option-group h3 {
+    font-family: "Shippori Mincho", serif;
     font-size: 15px;
-    color: #d4af37;
+    font-weight: 600;
+    color: #c9a86a;
     margin-bottom: 10px;
+    letter-spacing: 0.5px;
 }
 .option-hint {
     font-size: 12px;
-    color: #888;
+    color: #8a8478;
     margin: 8px 0 0;
     line-height: 1.5;
 }
 
-/* 現在の設定まとめ表示（弾倉数・弾の数のリアルタイムプレビュー） */
+/* 現在の設定まとめ表示（ガラスチップ風） */
 .settings-summary {
-    background: #0b132b;
-    border: 1px dashed #d4af37;
-    border-radius: 10px;
-    padding: 10px 14px;
+    background: rgba(212, 175, 55, 0.08);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 12px 14px;
     font-size: 14px;
-    color: #f9d423;
-    font-weight: bold;
+    color: #e8cd82;
+    font-weight: 600;
     text-align: center;
     margin: -6px 0 24px;
+    letter-spacing: 0.5px;
 }
 
 .chamber-select {
@@ -303,13 +357,13 @@ h1 {
 }
 .chamber-btn {
     flex: 1;
-    background: #0b132b;
-    border: 1px solid #3a506b;
-    color: #ccc;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #b9b3a6;
     padding: 14px 5px;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: bold;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
     transition: 0.2s;
     touch-action: manipulation;
@@ -318,15 +372,15 @@ h1 {
 .chamber-btn span {
     font-size: 11px;
     font-weight: normal;
-    color: #888;
+    color: #7d7768;
 }
 .chamber-btn.active {
-    background: linear-gradient(135deg, #e65c00, #f9d423);
-    color: #111;
-    border-color: transparent;
-    box-shadow: 0 0 16px rgba(249, 212, 35, 0.5);
+    background: rgba(212, 175, 55, 0.14);
+    border-color: rgba(212, 175, 55, 0.55);
+    color: #f0dca0;
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
-.chamber-btn.active span { color: #333; }
+.chamber-btn.active span { color: #d9c58e; }
 .chamber-btn:active { transform: scale(0.96); }
 
 .custom-penalty-row {
@@ -337,18 +391,22 @@ h1 {
     flex: 1;
 }
 .add-btn {
-    background: #3a506b;
-    color: #fff;
-    border: none;
-    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f2efe9;
+    border-radius: 12px;
     padding: 0 22px;
-    font-weight: bold;
+    font-weight: 600;
     cursor: pointer;
     touch-action: manipulation;
     min-height: 48px;
-    font-size: 16px;
+    font-size: 15px;
 }
-.add-btn:active { background: #f9d423; color: #111; }
+.add-btn:active {
+    background: rgba(212, 175, 55, 0.18);
+    border-color: rgba(212, 175, 55, 0.5);
+    color: #f0dca0;
+}
 
 .custom-penalty-list {
     list-style: none;
@@ -359,9 +417,9 @@ h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #0b132b;
-    border: 1px solid #3a506b;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
     padding: 10px 14px;
     margin-bottom: 6px;
     font-size: 14px;
@@ -369,7 +427,7 @@ h1 {
 .custom-penalty-list li button {
     background: none;
     border: none;
-    color: #ff6b6b;
+    color: #c97a6a;
     font-size: 20px;
     cursor: pointer;
     line-height: 1;
@@ -378,15 +436,16 @@ h1 {
 }
 
 .combo-banner {
-    font-size: 16px;
-    font-weight: bold;
-    color: #f9d423;
+    font-family: "Shippori Mincho", serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #e8cd82;
     min-height: 0;
     opacity: 0;
     max-height: 0;
     overflow: hidden;
     transition: opacity 0.3s ease;
-    text-shadow: 0 0 10px rgba(249, 212, 35, 0.5);
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.35);
 }
 .combo-banner.show {
     opacity: 1;
@@ -407,11 +466,11 @@ h1 {
 .penalty-choice-btn {
     display: block;
     width: 100%;
-    background: #0b132b;
-    border: 1px solid #3a506b;
-    color: #fff;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #ded9cf;
     padding: 14px;
-    border-radius: 10px;
+    border-radius: 12px;
     font-size: 14px;
     text-align: left;
     margin-bottom: 8px;
@@ -419,7 +478,11 @@ h1 {
     touch-action: manipulation;
     box-sizing: border-box;
 }
-.penalty-choice-btn:active { background: #f9d423; color: #111; }
+.penalty-choice-btn:active {
+    background: rgba(212, 175, 55, 0.16);
+    border-color: rgba(212, 175, 55, 0.5);
+    color: #f0dca0;
+}
 .penalty-custom-row {
     display: flex;
     gap: 8px;
@@ -429,51 +492,56 @@ h1 {
 
 .result-summary {
     margin-top: 20px;
-    padding: 18px;
-    background: #0b132b;
-    border: 1px solid #d4af37;
-    border-radius: 12px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.035);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 16px;
     text-align: left;
-    box-shadow: 0 0 20px rgba(212, 175, 55, 0.15);
+    box-shadow: 0 0 30px rgba(212, 175, 55, 0.1);
 }
 .result-summary h3 {
-    color: #f9d423;
+    font-family: "Shippori Mincho", serif;
+    color: #e8cd82;
     font-size: 17px;
-    margin: 0 0 10px;
+    font-weight: 600;
+    margin: 0 0 12px;
     text-align: center;
+    letter-spacing: 1px;
 }
 .result-summary p {
-    font-size: 15px;
+    font-size: 14px;
+    color: #ded9cf;
     margin: 8px 0;
 }
 
-/* 周回制モードで複数人が当たった時の一覧表示 */
 .hit-record-list {
     list-style: none;
     padding: 0;
     margin: 4px 0 10px;
 }
 .hit-record-list li {
-    background: #14203d;
-    border: 1px solid #3a506b;
-    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
     padding: 8px 12px;
     margin-bottom: 6px;
     font-size: 13px;
     line-height: 1.4;
+    color: #ded9cf;
 }
 
 /* ===== レスポンシブ対応 ===== */
 
 @media (max-width: 340px) {
     .app-content { padding: 18px 10px 130px; }
-    .card-box { padding: 20px 14px; }
+    .card-box { padding: 22px 16px; }
     .player-count-control { gap: 14px; }
-    .count-btn { width: 48px; height: 48px; font-size: 22px; }
+    .count-btn { width: 46px; height: 46px; font-size: 20px; }
     .chamber-select { gap: 6px; }
-    .chamber-btn { padding: 10px 2px; font-size: 13px; min-height: 50px; }
+    .chamber-btn { padding: 10px 2px; font-size: 12px; min-height: 50px; }
     .chamber-btn span { font-size: 10px; }
-    .action-btn { font-size: 18px; padding: 16px 20px; min-height: 56px; }
+    .action-btn { font-size: 16px; padding: 16px 20px; min-height: 56px; letter-spacing: 1.5px; }
     .cylinder-wrap { width: 180px; height: 180px; }
 }
 
@@ -490,6 +558,6 @@ h1 {
 
 @media (min-width: 700px) {
     .app-content { max-width: 480px; margin: 0 auto; }
-    .card-box { max-width: 480px; padding: 34px 30px; }
+    .card-box { max-width: 480px; padding: 36px 32px; }
     .bottom-bar { width: 480px; }
 }
