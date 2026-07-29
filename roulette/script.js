@@ -212,6 +212,7 @@ function startGame() {
 
     document.getElementById("startBtn").style.display = "none";
     document.getElementById("shootBtn").style.display = "block";
+    document.getElementById("nextTurnBtn").style.display = "none";
     document.getElementById("restartBtn").style.display = "none";
 
     initCylinderDrum();
@@ -224,6 +225,7 @@ function backToSetup() {
     document.getElementById("setupScreen").style.display = "block";
     document.getElementById("startBtn").style.display = "block";
     document.getElementById("shootBtn").style.display = "none";
+    document.getElementById("nextTurnBtn").style.display = "none";
     document.getElementById("restartBtn").style.display = "none";
 }
 
@@ -463,19 +465,27 @@ function proceedAfterHit(penaltyText) {
     if (currentAttempt >= totalChambers) {
         endGame();
     } else {
-        currentTurnIndex = (currentTurnIndex + 1) % players.length;
-        setTimeout(() => {
-            updateTurnDisplay();
-            document.getElementById("shootBtn").style.display = "block";
-            document.getElementById("shootBtn").disabled = false;
-            isAnimating = false;
-        }, 1800); // 当たった直後は少し長めに間を置いて余韻を出す
+        // 自動では進めず、「次の人へ進む」ボタンが押されるまで待つ
+        // (罰ゲームの実行中に画面が勝手に切り替わらないように)
+        document.getElementById("shootBtn").style.display = "none";
+        document.getElementById("nextTurnBtn").style.display = "block";
     }
+}
+
+// 「次の人へ進む」ボタンが押された時の処理
+function advanceToNextTurn() {
+    currentTurnIndex = (currentTurnIndex + 1) % players.length;
+    document.getElementById("nextTurnBtn").style.display = "none";
+    document.getElementById("shootBtn").style.display = "block";
+    document.getElementById("shootBtn").disabled = false;
+    updateTurnDisplay();
+    isAnimating = false;
 }
 
 // ゲーム終了時のMVP・記録表示
 function endGame() {
     document.getElementById("shootBtn").style.display = "none";
+    document.getElementById("nextTurnBtn").style.display = "none";
     document.getElementById("restartBtn").style.display = "block";
 
     const summary = document.getElementById("resultSummary");
@@ -515,6 +525,7 @@ function resetGame() {
 
     document.getElementById("shootBtn").disabled = false;
     document.getElementById("shootBtn").style.display = "block";
+    document.getElementById("nextTurnBtn").style.display = "none";
     document.getElementById("restartBtn").style.display = "none";
     document.getElementById("resultSummary").style.display = "none";
     document.getElementById("comboBanner").classList.remove("show");

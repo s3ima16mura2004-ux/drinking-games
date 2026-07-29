@@ -180,8 +180,8 @@ h1 {
     transform: none;
 }
 
-/* もう一度遊ぶボタンは、控えめなエメラルドグラスで差別化 */
-#restartBtn {
+/* もう一度遊ぶ／次の人へ進むボタンは、控えめなエメラルドグラスで差別化 */
+#restartBtn, #nextTurnBtn {
     background: rgba(72, 187, 120, 0.16);
     color: #bdeccb;
     border: 1px solid rgba(72, 187, 120, 0.45);
