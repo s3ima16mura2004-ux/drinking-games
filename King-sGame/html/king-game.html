@@ -96,6 +96,11 @@
 
   <!-- ============ 画面2: 待合室 ============ -->
   <section id="screen-lobby" class="screen">
+    <div id="lobby-onboarding" class="card onboarding-card" hidden>
+      <p>🏮 <strong>王様ゲームへようこそ。</strong>部屋コードやQRコードを仲間に共有して、3人以上集まったら幹事がくじ引きを開始します。くじで王様になった人がお題を選んで発表し、対象者がそれをこなす、というシンプルな流れです。</p>
+      <button id="btn-close-onboarding" class="btn btn-ghost btn-small" type="button">わかった</button>
+    </div>
+
     <div class="card">
       <div class="room-code-block">
         <p class="field-label">部屋コード</p>
@@ -159,7 +164,15 @@
 
     <!-- 王様だけに見える命令フォーム -->
     <div id="king-command-panel" class="card" hidden>
-      <h2 class="card-title">👑 王様の命令</h2>
+      <h2 class="card-title">👑 王様の命令
+        <button id="btn-king-help" class="help-btn" type="button" aria-label="使い方を見る">?</button>
+      </h2>
+
+      <div id="king-help-box" class="help-box" hidden>
+        <p>お題は下のカテゴリから選ぶか、🎲ランダムで決めることもできます。「みんなで投票する」に切り替えると参加者に3択で決めてもらえます。</p>
+        <p>命令内容は自由に書き換えられます。既存のお題を使わずに自分で考えた場合は、下のチェックを入れるとこの部屋だけのオリジナルお題として保存できます。</p>
+        <button id="btn-close-king-help" class="btn btn-ghost btn-small" type="button">閉じる</button>
+      </div>
 
       <div class="mode-toggle">
         <button id="btn-mode-manual" class="mode-toggle-btn is-active" type="button" aria-pressed="true">自分で選ぶ</button>
@@ -273,7 +286,11 @@
 <script src="../js/qrcode-lib.js?v=1"></script>
 <script src="../js/king-game-config.js?v=1"></script>
 <script src="../js/king-game-templates.js?v=1"></script>
-<script src="../js/king-game.js?v=6"></script>
+<script src="../js/king-game-core.js?v=1"></script>
+<script src="../js/king-game-lobby.js?v=1"></script>
+<script src="../js/king-game-room.js?v=1"></script>
+<script src="../js/king-game-draw.js?v=1"></script>
+<script src="../js/king-game-command.js?v=1"></script>
 
 </body>
 </html>

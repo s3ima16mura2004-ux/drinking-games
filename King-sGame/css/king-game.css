@@ -198,6 +198,49 @@ body {
   margin: 0 0 16px;
   color: var(--paper);
   letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-soft);
+  background: transparent;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.help-box {
+  background: var(--bg-night-deep);
+  border: 1px dashed var(--gold-soft);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin: 0 0 16px;
+}
+
+.help-box p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--paper-dim);
+  line-height: 1.6;
+}
+
+.onboarding-card {
+  border-color: var(--gold-soft);
+}
+
+.onboarding-card p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--paper-dim);
 }
 
 /* ---------- ホーム画面 ---------- */
